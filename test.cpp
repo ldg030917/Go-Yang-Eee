@@ -1,0 +1,330 @@
+// ... (위쪽 헤더는 동일) ...
+#include <windows.h>
+#include <gdiplus.h>
+#include <time.h> // 맨 위에 추가
+#include <shlwapi.h> // IStream 변환용 (필요시)
+
+// ... (링크 설정 동일) ...
+
+using namespace Gdiplus;
+
+// ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!
+const int FRAME_WIDTH = 32;   // 프레임 1개의 가로 크기
+const int FRAME_HEIGHT = 32;  // 프레임 1개의 세로 크기
+const int ANIM_SPEED = 100;   // 애니메이션 속도 (ms)
+const float SCALE = 3.0f;   // 두 배로 키우기
+const int MOVE_SPEED = 10;
+
+int speedX = 0; // 0: 정지, -5: 왼쪽, 5: 오른쪽
+int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
+
+// 화면 크기 (나중에 화면 밖으로 나가는 거 막으려고)
+int screenW = GetSystemMetrics(SM_CXSCREEN);
+int screenH = GetSystemMetrics(SM_CYSCREEN);
+
+bool isLookingRight = true; // true: 오른쪽, false: 왼쪽
+
+enum ActionType {
+    IDLE = 0,
+    IDLE2,
+    CLEAN,
+    CLEAN2,
+    MOVE,
+    MOVE2,
+    SLEEP,
+    PAW,
+    JUMP,
+    SCARED,
+    MAX_ACTIONS
+};
+
+const int ACTION_FRAMES[MAX_ACTIONS] = {4, 4, 4, 4, 8, 8, 4, 6, 7, 8};
+int currentAction = IDLE;
+int maxFrame = ACTION_FRAMES[IDLE]; // 현재 행동의 최대 프레임 수
+
+// 전역 변수
+const wchar_t CLASS_NAME[] = L"MyDesktopPetClass";
+Image* petImage = nullptr;
+int currentFrame = 0; // 현재 보여줄 프레임 번호 (0 ~ FRAME_COUNT-1)
+
+void SetAction(int newAction) {
+    if (currentAction != newAction) {
+        currentAction = newAction;
+        currentFrame = 0; // 행동 바뀌면 처음부터 재생
+        maxFrame = ACTION_FRAMES[newAction]; // 최대 프레임 수 갱신
+    }
+}
+
+void Think() {
+    // 랜덤으로 다음 행동 결정 (0: IDLE, 1: WALK_LEFT, 2: WALK_RIGHT)
+    int choice = rand() % 5; 
+    // 다음 생각할 시간 설정 (예: 20~50 프레임 뒤에 다시 생각)
+    timeToThink = 20 + (rand() % 30);
+    switch (choice) {
+    case 0: // 가만히 있기
+        SetAction((rand()%2 == 0) ? IDLE : IDLE2);
+        speedX = 0;
+        break;
+
+    case 1: // 왼쪽으로 걷기
+        SetAction((rand()%2 == 0) ? MOVE : MOVE2); // 걷는 모션 (상수 없으면 RUN 등으로 대체)
+        speedX = -MOVE_SPEED;     // 왼쪽 이동
+        isLookingRight = false;
+        timeToThink = 10 + (rand() % 20);
+        break;
+
+    case 2: // 오른쪽으로 걷기
+        SetAction((rand()%2 == 0) ? MOVE : MOVE2);
+        speedX = MOVE_SPEED;      // 오른쪽 이동
+        isLookingRight = true;
+        timeToThink = 10 + (rand() % 20);
+        break;
+    case 3: // 잠자기
+        SetAction(SLEEP);
+        speedX = 0;
+        break;
+    case 4: // 핥기
+        SetAction((rand()%2 == 0) ? CLEAN : CLEAN2);
+        speedX = 0;
+        break;
+    }
+}
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_CREATE:
+        // ★ 타이머 시작 (ID: 1, 시간: ANIM_SPEED ms)
+        SetTimer(hwnd, 1, ANIM_SPEED, NULL);
+        return 0;
+
+    case WM_TIMER:
+        if (wParam == 1) {
+            // 프레임 번호 증가 (0 -> 1 -> 2 -> 3 -> 0 ...)
+            currentFrame = (currentFrame + 1) % maxFrame;
+            
+            // 2. AI 생각하기
+            if (timeToThink > 0) {
+                timeToThink--; // 생각할 시간 카운트다운
+            } else {
+                Think(); // 시간 다 됐으면 새로운 행동 결정!
+            }
+
+            // 3. 실제 이동 (걷는 상태라면 창 위치 옮기기)
+            if (speedX != 0) {
+                RECT rect;
+                GetWindowRect(hwnd, &rect); // 현재 창 위치 가져오기
+                
+                int newX = rect.left + speedX;
+                
+                // 화면 밖으로 나가는지 체크 (간단하게)
+                if (newX < 0) newX = 0;
+                if (newX > screenW - 100) newX = screenW - 100;
+
+                // 창의 가로 크기
+                int winW = (int)(FRAME_WIDTH * SCALE);
+
+                // ★ 벽 감지 로직
+                bool hitWall = false;
+                int currentWinWidth = rect.right - rect.left;
+                // 1. 왼쪽 벽 충돌
+                if (newX <= 0) {
+                    newX = 0;
+                    hitWall = true;
+                }
+                // 2. 오른쪽 벽 충돌
+                else if (newX >= screenW - currentWinWidth - 10) {
+                    newX = screenW - currentWinWidth;
+                    hitWall = true;
+                }
+
+                // ★ 벽에 부딪혔다면? -> 이동 멈추고 "때리기(PAW)" 행동 개시
+                if (hitWall) {
+                    speedX = 0;         // 멈춤
+                    SetAction(PAW);     // 벽 긁기 모션
+                    timeToThink = 20;   // 20프레임 동안 긁기
+                } 
+                else {
+                    // 벽이 아니면 정상 이동
+                    SetWindowPos(hwnd, NULL, newX, rect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+                }
+            }
+
+            // 화면 전체를 다시 그리라고 요청 (WM_PAINT 유발)
+            InvalidateRect(hwnd, NULL, TRUE); 
+        }
+        return 0;
+
+    case WM_DESTROY:
+        KillTimer(hwnd, 1); // 타이머 끄기
+        PostQuitMessage(0);
+        return 0;
+    
+    // ... (ESC 종료 코드는 동일) ...
+
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        Graphics graphics(hdc);
+        
+        // ★ 추가: 이미지를 확대할 때 픽셀을 섞지 말고 그대로 키워라 (도트 유지)
+        graphics.SetInterpolationMode(InterpolationModeNearestNeighbor);
+        graphics.SetPixelOffsetMode(PixelOffsetModeHalf); // 픽셀 좌표 정확도 보정
+
+        if (petImage != nullptr) {
+            // ★ 아틀라스에서 현재 프레임만큼만 잘라서 그리기
+            
+            int drawW = (int)(FRAME_WIDTH * SCALE);
+            int drawH = (int)(FRAME_HEIGHT * SCALE);
+
+            // 그릴 위치 (화면): (0, 0) 부터 (FRAME_WIDTH, FRAME_HEIGHT) 까지
+            Rect destRect(0, 0, drawW, drawH);
+            
+            // ...
+            int srcX = currentFrame * FRAME_WIDTH;
+
+            // ★ 추가: 행동(currentAction)에 따라 몇 번째 줄인지 계산
+            int srcY = currentAction * FRAME_HEIGHT;
+            int srcW = FRAME_WIDTH;  // 원본 너비
+
+            // ★ 좌우 반전 로직
+            if (!isLookingRight) {
+                // 왼쪽을 봐야 한다면?
+                // 시작점을 '이미지 오른쪽 끝'으로 옮기고, 너비를 '마이너스'로 설정
+                srcX += FRAME_WIDTH; 
+                srcW = -FRAME_WIDTH; 
+            }
+
+            // ★ 수정: srcY를 0 대신 변수로 교체
+            graphics.DrawImage(petImage, destRect, srcX, srcY, srcW, FRAME_HEIGHT, UnitPixel);
+
+        }
+
+        // WM_PAINT 내부, EndPaint(hwnd, &ps); 바로 윗줄에 추가
+
+        // // ★ 디버깅용 텍스트 출력
+        // HFONT hFont = CreateFontW(20, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Arial");
+        // SelectObject(hdc, hFont);
+        // SetTextColor(hdc, RGB(0, 0, 0)); // 검은색 글씨
+        // SetBkMode(hdc, TRANSPARENT);
+
+        // // 현재 창 위치와 화면 크기 가져오기
+        // RECT r; 
+        // GetWindowRect(hwnd, &r);
+        // int myX = r.left;
+        // int realWinW = r.right - r.left;
+        // int scrW = GetSystemMetrics(SM_CXSCREEN);
+
+        // // 문자열 만들기: "내X좌표 + 내너비 / 화면폭"
+        // WCHAR debugText[100];
+        // wsprintfW(debugText, L"%d/%d", myX + realWinW, scrW);
+
+        // // 그리기
+        // TextOutW(hdc, 0, 0, debugText, lstrlenW(debugText));
+        // DeleteObject(hFont);
+
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    // ... WindowProc 내부 switch 문 안에 추가 ...
+
+    case WM_RBUTTONUP: {
+        // 1. 빈 팝업 메뉴 만들기
+        HMENU hMenu = CreatePopupMenu();
+        
+        // 2. 메뉴 항목 추가 (ID: 1001)
+        AppendMenuW(hMenu, MF_STRING, 1001, L"종료(Exit)");
+        
+        // 3. 마우스 위치에 메뉴 띄우기
+        POINT pt;
+        GetCursorPos(&pt); // 현재 마우스 좌표 가져오기
+        
+        // 메뉴 보여주고 선택 기다리기 (Blocking 아님)
+        SetForegroundWindow(hwnd); // 메뉴 띄우기 전 포커스 잡기 (버그 방지)
+        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+        
+        DestroyMenu(hMenu); // 다 쓴 메뉴 껍데기 삭제
+        return 0;
+    }
+
+    case WM_COMMAND: {
+        // 메뉴에서 무언가 선택했을 때 실행됨
+        if (LOWORD(wParam) == 1001) { // 아까 정한 ID가 1001이면
+            DestroyWindow(hwnd); // 종료
+        }
+        return 0;
+    }
+
+    }
+    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
+}
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow) {
+    // ... (GdiplusStartup 부분 동일) ...
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+    // WinMain 시작 부분
+    srand((unsigned int)time(NULL)); // 랜덤 시드 초기화
+    // WinMain 함수 시작 부분
+
+    // // 1. user32.dll에서 함수 주소 가져오기 (동적 로딩)
+    // HMODULE hUser32 = LoadLibraryW(L"user32.dll");
+    // if (hUser32) {
+    //     typedef BOOL (WINAPI *LPSETPROCESSDPIAWARE)(void);
+    //     LPSETPROCESSDPIAWARE lpSetProcessDPIAware = (LPSETPROCESSDPIAWARE)GetProcAddress(hUser32, "SetProcessDPIAware");
+        
+    //     if (lpSetProcessDPIAware) {
+    //         lpSetProcessDPIAware(); // 함수 실행!
+    //     }
+    //     FreeLibrary(hUser32);
+    // }
+
+    //SetProcessDPIAware();
+
+    WNDCLASSEXW wc = { sizeof(WNDCLASSEXW) };
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = CLASS_NAME;
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = CreateSolidBrush(RGB(255, 0, 255)); // 배경색
+
+    RegisterClassExW(&wc);
+    // WinMain에서 CreateWindowExW 호출하기 직전에 계산
+    // 1. 화면 크기 구하기
+    int scrW = GetSystemMetrics(SM_CXSCREEN);
+    int scrH = GetSystemMetrics(SM_CYSCREEN);
+
+    // 2. 창 크기 (아까 계산해둔 winW, winH 사용)
+    int winW = (int)(FRAME_WIDTH * SCALE);
+    int winH = (int)(FRAME_HEIGHT * SCALE);
+
+    // 3. 시작 위치 계산 (우측 하단)
+    int startX = scrW - winW - 50; // 오른쪽에서 50px 떨어짐
+    int startY = scrH - winH - 50; // 아래쪽에서 50px 떨어짐 (작업표시줄 고려)
+
+    // 4. 창 생성 (좌표 부분에 변수 넣기)
+    HWND hwnd = CreateWindowExW(
+        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        CLASS_NAME, L"My Pet", WS_POPUP,
+        startX, startY, // ★ 여기를 100, 100 대신 변수로 교체
+        winW, winH,
+        NULL, NULL, hInstance, NULL
+    );
+
+    SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
+
+    petImage = Image::FromFile(L"pet.png");
+
+    ShowWindow(hwnd, nCmdShow);
+
+    MSG msg = { };
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    delete petImage;
+    GdiplusShutdown(gdiplusToken);
+    return 0;
+}

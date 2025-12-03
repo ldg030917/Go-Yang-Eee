@@ -168,69 +168,60 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
-        Graphics graphics(hdc);
-        
-        // ★ 추가: 이미지를 확대할 때 픽셀을 섞지 말고 그대로 키워라 (도트 유지)
+
+        // 1. 더블 버퍼링용 메모리 DC 만들기
+        RECT rc;
+        GetClientRect(hwnd, &rc);
+        int w = rc.right - rc.left;
+        int h = rc.bottom - rc.top;
+
+        HDC memDC = CreateCompatibleDC(hdc);          // 가상의 그리기 도구
+        HBITMAP memBitmap = CreateCompatibleBitmap(hdc, w, h); // 가상의 종이
+        HBITMAP oldBitmap = (HBITMAP)SelectObject(memDC, memBitmap);
+
+        // 2. 메모리 DC에 배경 칠하기 (투명색 마젠타로)
+        HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 255));
+        FillRect(memDC, &rc, hBrush);
+        DeleteObject(hBrush);
+
+        // 3. GDI+로 메모리 DC에 그림 그리기
+        Graphics graphics(memDC); // ★ hdc 대신 memDC 사용
         graphics.SetInterpolationMode(InterpolationModeNearestNeighbor);
-        graphics.SetPixelOffsetMode(PixelOffsetModeHalf); // 픽셀 좌표 정확도 보정
+        graphics.SetPixelOffsetMode(PixelOffsetModeHalf);
 
         if (petImage != nullptr) {
-            // ★ 아틀라스에서 현재 프레임만큼만 잘라서 그리기
-            
+            // ... (그리기 좌표 계산 로직 동일) ...
             int drawW = (int)(FRAME_WIDTH * SCALE);
             int drawH = (int)(FRAME_HEIGHT * SCALE);
-
-            // 그릴 위치 (화면): (0, 0) 부터 (FRAME_WIDTH, FRAME_HEIGHT) 까지
             Rect destRect(0, 0, drawW, drawH);
-            
-            // ...
+
             int srcX = currentFrame * FRAME_WIDTH;
-
-            // ★ 추가: 행동(currentAction)에 따라 몇 번째 줄인지 계산
             int srcY = currentAction * FRAME_HEIGHT;
-            int srcW = FRAME_WIDTH;  // 원본 너비
+            int srcW = FRAME_WIDTH;
 
-            // ★ 좌우 반전 로직
             if (!isLookingRight) {
-                // 왼쪽을 봐야 한다면?
-                // 시작점을 '이미지 오른쪽 끝'으로 옮기고, 너비를 '마이너스'로 설정
-                srcX += FRAME_WIDTH; 
-                srcW = -FRAME_WIDTH; 
+                srcX += FRAME_WIDTH;
+                srcW = -FRAME_WIDTH;
             }
 
-            // ★ 수정: srcY를 0 대신 변수로 교체
             graphics.DrawImage(petImage, destRect, srcX, srcY, srcW, FRAME_HEIGHT, UnitPixel);
-
         }
 
-        // WM_PAINT 내부, EndPaint(hwnd, &ps); 바로 윗줄에 추가
+        // 4. 완성된 그림을 실제 화면에 복사 (BitBlt)
+        BitBlt(hdc, 0, 0, w, h, memDC, 0, 0, SRCCOPY);
 
-        // // ★ 디버깅용 텍스트 출력
-        // HFONT hFont = CreateFontW(20, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Arial");
-        // SelectObject(hdc, hFont);
-        // SetTextColor(hdc, RGB(0, 0, 0)); // 검은색 글씨
-        // SetBkMode(hdc, TRANSPARENT);
-
-        // // 현재 창 위치와 화면 크기 가져오기
-        // RECT r; 
-        // GetWindowRect(hwnd, &r);
-        // int myX = r.left;
-        // int realWinW = r.right - r.left;
-        // int scrW = GetSystemMetrics(SM_CXSCREEN);
-
-        // // 문자열 만들기: "내X좌표 + 내너비 / 화면폭"
-        // WCHAR debugText[100];
-        // wsprintfW(debugText, L"%d/%d", myX + realWinW, scrW);
-
-        // // 그리기
-        // TextOutW(hdc, 0, 0, debugText, lstrlenW(debugText));
-        // DeleteObject(hFont);
-
+        // 5. 정리
+        SelectObject(memDC, oldBitmap);
+        DeleteObject(memBitmap);
+        DeleteDC(memDC);
 
         EndPaint(hwnd, &ps);
         return 0;
     }
-    // ... WindowProc 내부 switch 문 안에 추가 ...
+
+    // ★ 중요: 배경 지우기 방지 (WM_ERASEBKGND)
+    case WM_ERASEBKGND:
+        return 1; // "내가 이미 다 지웠으니까 윈도우 너는 아무것도 하지 마" (깜빡임 원인 제거)
 
     case WM_RBUTTONUP: {
         // 1. 빈 팝업 메뉴 만들기

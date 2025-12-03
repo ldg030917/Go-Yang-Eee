@@ -24,6 +24,9 @@ int screenH = GetSystemMetrics(SM_CYSCREEN);
 
 bool isLookingRight = true; // true: 오른쪽, false: 왼쪽
 
+bool isDragging = false; // 지금 잡혀있는지?
+POINT dragOffset;
+
 enum ActionType {
     IDLE = 0,
     IDLE2,
@@ -56,6 +59,7 @@ void SetAction(int newAction) {
 }
 
 void Think() {
+    if (isDragging) return;
     // 랜덤으로 다음 행동 결정 (0: IDLE, 1: WALK_LEFT, 2: WALK_RIGHT)
     int choice = rand() % 5; 
     // 다음 생각할 시간 설정 (예: 20~50 프레임 뒤에 다시 생각)
@@ -244,6 +248,61 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
         
         DestroyMenu(hMenu); // 다 쓴 메뉴 껍데기 삭제
+        return 0;
+    }
+
+    // 1. 마우스 왼쪽 버튼 누름 (잡기 시작)
+    case WM_LBUTTONDOWN: {
+        isDragging = true;
+        speedX = 0;
+        // 잡힌 모션으로 변경 (GRABBED 같은 액션 미리 만들어둬야 함)
+        // 없다면 일단 IDLE이나 놀란 표정(SCARED) 등으로
+        SetAction(SCARED); // ★ 잡힌 모션 상수로 변경 필요
+        
+        // 현재 마우스 위치 기억 (고양이의 '어디'를 잡았는지 계산)
+        POINT pt;
+        GetCursorPos(&pt);
+        
+        RECT rect;
+        GetWindowRect(hwnd, &rect);
+        
+        // 오차 저장 (마우스좌표 - 창시작점)
+        dragOffset.x = pt.x - rect.left;
+        dragOffset.y = pt.y - rect.top;
+        
+        // 마우스가 창 밖으로 나가도 계속 잡고 있게 함 (필수)
+        SetCapture(hwnd); 
+        return 0;
+    }
+
+    // 2. 마우스 움직임 (드래그 중)
+    case WM_MOUSEMOVE: {
+        if (isDragging) {
+            POINT pt;
+            GetCursorPos(&pt); // 현재 마우스 위치(전체화면 기준)
+            
+            // 새 위치 = 현재 마우스 - 아까 저장한 오차
+            int newX = pt.x - dragOffset.x;
+            int newY = pt.y - dragOffset.y;
+            
+            // 창 위치 옮기기
+            SetWindowPos(hwnd, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+        }
+        return 0;
+    }
+
+    // 3. 마우스 왼쪽 버튼 뗌 (놓아주기)
+    case WM_LBUTTONUP: {
+        if (isDragging) {
+            isDragging = false;
+            ReleaseCapture(); // 마우스 캡쳐 해제
+            
+            // 땅에 떨어지는 모션이나 IDLE로 복귀
+            SetAction(IDLE); 
+            
+            // 바로 딴짓 못하게 딜레이 좀 주기
+            timeToThink = 30;
+        }
         return 0;
     }
 

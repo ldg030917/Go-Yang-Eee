@@ -15,7 +15,7 @@ const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 // ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!
 const int FRAME_WIDTH = 32;   // 프레임 1개의 가로 크기
 const int FRAME_HEIGHT = 32;  // 프레임 1개의 세로 크기
-const int ANIM_SPEED = 100;   // 애니메이션 속도 (ms)
+const int ANIM_SPEED = 96;   // 애니메이션 속도 (ms)
 const int PHYSICS_SPEED = 16; // ★ 추가: 물리 갱신 속도 (약 60 FPS)
 const float SCALE = 3.0f;   // 세 배로 키우기
 const int MOVE_SPEED = 5;

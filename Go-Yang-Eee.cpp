@@ -16,15 +16,26 @@ const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 const int FRAME_WIDTH = 32;   // 프레임 1개의 가로 크기
 const int FRAME_HEIGHT = 32;  // 프레임 1개의 세로 크기
 const int ANIM_SPEED = 100;   // 애니메이션 속도 (ms)
-const float SCALE = 5.0f;   // 두 배로 키우기
+const int PHYSICS_SPEED = 16; // ★ 추가: 물리 갱신 속도 (약 60 FPS)
+const float SCALE = 3.0f;   // 세 배로 키우기
 const int MOVE_SPEED = 10;
 
 int speedX = 0; // 0: 정지, -5: 왼쪽, 5: 오른쪽
 int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
 
+float vy = 0.0f; // 수직 속도
+float gravity = 0.1f; // 중력 가속도
+bool isJumping = false; // 점프/낙하 상태 확인용
+
 // 화면 크기 (나중에 화면 밖으로 나가는 거 막으려고)
 int screenW = GetSystemMetrics(SM_CXSCREEN);
 int screenH = GetSystemMetrics(SM_CYSCREEN);
+
+// ★ [수정] 위치와 크기를 관리할 전역 변수 추가
+int posX = 0; // 현재 윈도우 X 위치
+int posY = 0; // 현재 윈도우 Y 위치
+int winW = 0; // 창 가로 크기 (계산된 값)
+int winH = 0; // 창 세로 크기 (계산된 값)
 
 int debugDX = 0;
 int debugDY = 0;
@@ -51,10 +62,12 @@ enum ActionType {
     PAW,
     JUMP,
     SCARED,
+    WIP,
+    GRABBED,
     MAX_ACTIONS
 };
 
-const int ACTION_FRAMES[MAX_ACTIONS] = {4, 4, 4, 4, 8, 8, 4, 6, 7, 8};
+const int ACTION_FRAMES[MAX_ACTIONS] = {4, 4, 4, 4, 8, 8, 4, 6, 7, 8, 4, 8};
 int currentAction = IDLE;
 int maxFrame = ACTION_FRAMES[IDLE]; // 현재 행동의 최대 프레임 수
 
@@ -142,68 +155,82 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     case WM_TIMER:
         if (wParam == 1) {
-            // 프레임 번호 증가 (0 -> 1 -> 2 -> 3 -> 0 ...)
+            // -------------------------------------------------
+            // 1. 애니메이션 프레임 변경
+            // -------------------------------------------------
             currentFrame = (currentFrame + 1) % maxFrame;
-            
-            // 2. AI 생각하기
-            if (timeToThink > 0) {
-                timeToThink--; // 생각할 시간 카운트다운
-            } else {
-                Think(); // 시간 다 됐으면 새로운 행동 결정!
+
+            // -------------------------------------------------
+            // 2. AI 생각 (행동 결정)
+            // -------------------------------------------------
+            if (!isDragging) { // 드래그 중엔 생각 안 함
+                if (timeToThink > 0) timeToThink--;
+                else Think();
             }
 
-            // 3. 실제 이동 (걷는 상태라면 창 위치 옮기기)
-            if (speedX != 0) {
-                RECT rect;
-                GetWindowRect(hwnd, &rect); // 현재 창 위치 가져오기
-                
-                int newX = rect.left + speedX;
-                
-                // 화면 밖으로 나가는지 체크 (간단하게)
-                if (newX < 0) newX = 0;
-                if (newX > screenW - 100) newX = screenW - 100;
+            // -------------------------------------------------
+            // 3. 물리 엔진 (중력 & 이동 통합)
+            // -------------------------------------------------
+            if (!isDragging) {
+                // // (1) 작업 영역(바닥) 구하기
+                // RECT workArea;
+                // SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+                // int floorY = workArea.bottom; // 바닥 좌표
 
-                // 창의 가로 크기
-                int winW = (int)(FRAME_WIDTH * SCALE);
+                // // (2) 중력 적용 (Y축)
+                // vy += gravity;
+                // posY += (int)vy;
 
-                // ★ 벽 감지 로직
+                // // 바닥 충돌 처리
+                // if (posY + winH >= floorY) { // winH(전역변수) 사용
+                //     posY = floorY - winH; // 바닥에 착지
+                //     vy = 0.0f;
+                    
+                //     // 떨어지다가 착지했으면 IDLE로 복귀 (점프 모션 끝)
+                //     if (currentAction == JUMP && isJumping) {
+                //          isJumping = false;
+                //          SetAction(IDLE);
+                //     }
+                // }
+
+                // (3) 좌우 이동 적용 (X축)
+                posX += speedX;
+
+                // (4) 벽 충돌 처리 (X축)
                 bool hitWall = false;
-                int currentWinWidth = rect.right - rect.left;
-                // 1. 왼쪽 벽 충돌
-                if (newX <= 0) {
-                    newX = 0;
+                if (posX <= 0) {
+                    posX = 0;
                     hitWall = true;
                 }
-                // 2. 오른쪽 벽 충돌
-                else if (newX >= screenW - currentWinWidth - 10) {
-                    newX = screenW - currentWinWidth;
+                else if (posX >= screenW - winW) {
+                    posX = screenW - winW;
                     hitWall = true;
                 }
 
-                // ★ 벽에 부딪혔다면? -> 이동 멈추고 "때리기(PAW)" 행동 개시
-                if (hitWall) {
-                    speedX = 0;         // 멈춤
-                    SetAction(PAW);     // 벽 긁기 모션
-                    timeToThink = 20;   // 20프레임 동안 긁기
-                } 
-                else {
-                    // 벽이 아니면 정상 이동
-                    SetWindowPos(hwnd, NULL, newX, rect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+                if (hitWall && speedX != 0) {
+                    speedX = 0;
+                    SetAction(PAW); // 벽 긁기
+                    timeToThink = 20;
                 }
+
+                // (5) 최종 위치 반영 (한 번만 호출)
+                SetWindowPos(hwnd, NULL, posX, posY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
             }
 
-            // 화면 전체를 다시 그리라고 요청 (WM_PAINT 유발)
-            InvalidateRect(hwnd, NULL, TRUE); 
-        }
-        // 쓰다듬기 게이지 관리
-        if (rubCount > 0) {
-            rubDecayTimer++;
-            if (rubDecayTimer > 10) {   // 10프레임(약 1초) 동안 안 쓰다듬으면
-                rubCount -= 10;
-                if (rubCount < 0) rubCount = 0;
+            // 4. 화면 다시 그리기
+            InvalidateRect(hwnd, NULL, TRUE);
+            
+            // (쓰다듬기 게이지 감소 로직은 여기 아래에 그대로 두시면 됩니다)
+            if (rubCount > 0) {
+                rubDecayTimer++;
+                if (rubDecayTimer > 10) { // 10프레임(약 1초) 동안 안 쓰다듬으면
+                    rubCount -= 10;
+                    if (rubCount < 0) rubCount = 0;
+                }
             }
         }
         return 0;
+
 
     case WM_DESTROY:
         RemoveTrayIcon(hwnd); // ★ 트레이 아이콘 삭제 (이거 안 하면 프로그램 꺼져도 아이콘 남음)
@@ -330,7 +357,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         speedX = 0;
         // 잡힌 모션으로 변경 (GRABBED 같은 액션 미리 만들어둬야 함)
         // 없다면 일단 IDLE이나 놀란 표정(SCARED) 등으로
-        SetAction(SCARED); // ★ 잡힌 모션 상수로 변경 필요
+        SetAction(GRABBED); // ★ 잡힌 모션 상수로 변경 필요
         
         // 현재 마우스 위치 기억 (고양이의 '어디'를 잡았는지 계산)
         POINT pt;
@@ -362,6 +389,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int newX = pt.x - dragOffset.x;
             int newY = pt.y - dragOffset.y;
             
+            // ★ [중요] 전역 변수에 현재 위치 동기화! (이거 안 하면 놓는 순간 텔레포트 함)
+            posX = newX;
+            posY = newY;
+            vy = 0.0f; // 잡고 있는 동안은 떨어지는 속도 0으로 초기화
+
             // 창 위치 옮기기
             SetWindowPos(hwnd, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
@@ -455,18 +487,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     int scrH = GetSystemMetrics(SM_CYSCREEN);
 
     // 2. 창 크기 (아까 계산해둔 winW, winH 사용)
-    int winW = (int)(FRAME_WIDTH * SCALE);
-    int winH = (int)(FRAME_HEIGHT * SCALE);
+    winW = (int)(FRAME_WIDTH * SCALE);
+    winH = (int)(FRAME_HEIGHT * SCALE);
 
-    // 3. 시작 위치 계산 (우측 하단)
-    int startX = scrW - winW - 50; // 오른쪽에서 50px 떨어짐
-    int startY = scrH - winH - 50; // 아래쪽에서 50px 떨어짐 (작업표시줄 고려)
+    RECT workArea;
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0); // 작업영역 기준
+    
+    posX = workArea.right - winW - 50;
+    posY = workArea.bottom - winH; // 바닥에 딱 붙여서 시작
 
     // 4. 창 생성 (좌표 부분에 변수 넣기)
     HWND hwnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
         CLASS_NAME, L"My Pet", WS_POPUP,
-        startX, startY, // ★ 여기를 100, 100 대신 변수로 교체
+        posX, posY, // ★ 여기를 100, 100 대신 변수로 교체
         winW, winH,
         NULL, NULL, hInstance, NULL
     );

@@ -3,10 +3,14 @@
 #include <gdiplus.h>
 #include <time.h> // 맨 위에 추가
 #include <shlwapi.h> // IStream 변환용 (필요시)
+#include <shellapi.h> // Shell_NotifyIcon 용
 
 // ... (링크 설정 동일) ...
 
 using namespace Gdiplus;
+
+#define WM_TRAYICON (WM_USER + 1) // 트레이 아이콘 메시지 ID
+const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 
 // ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!
 const int FRAME_WIDTH = 32;   // 프레임 1개의 가로 크기
@@ -103,11 +107,37 @@ void Think() {
     }
 }
 
+void InitTrayIcon(HWND hwnd) {
+    NOTIFYICONDATAW nid = { 0 };
+    nid.cbSize = sizeof(NOTIFYICONDATAW);
+    nid.hWnd = hwnd;
+    nid.uID = ID_TRAY_ICON;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = WM_TRAYICON; // 이 메시지로 알림을 받겠다
+    
+    // 아이콘 로드 (본인 아이콘 있으면 LoadImage로 교체, 지금은 기본 느낌표 아이콘)
+    nid.hIcon = LoadIcon(NULL, IDI_APPLICATION); 
+    
+    // 마우스 올렸을 때 툴팁
+    lstrcpyW(nid.szTip, L"My Desktop Pet");
+
+    Shell_NotifyIconW(NIM_ADD, &nid);
+}
+
+void RemoveTrayIcon(HWND hwnd) {
+    NOTIFYICONDATAW nid = { 0 };
+    nid.cbSize = sizeof(NOTIFYICONDATAW);
+    nid.hWnd = hwnd;
+    nid.uID = ID_TRAY_ICON;
+    Shell_NotifyIconW(NIM_DELETE, &nid);
+}
+
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_CREATE:
         // ★ 타이머 시작 (ID: 1, 시간: ANIM_SPEED ms)
         SetTimer(hwnd, 1, ANIM_SPEED, NULL);
+        InitTrayIcon(hwnd); // ★ 트레이 아이콘 등록
         return 0;
 
     case WM_TIMER:
@@ -176,12 +206,29 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
 
     case WM_DESTROY:
+        RemoveTrayIcon(hwnd); // ★ 트레이 아이콘 삭제 (이거 안 하면 프로그램 꺼져도 아이콘 남음)
         KillTimer(hwnd, 1); // 타이머 끄기
         PostQuitMessage(0);
         return 0;
     
-    // ... (ESC 종료 코드는 동일) ...
+    // ★ 트레이 아이콘 클릭 이벤트 처리
+    case WM_TRAYICON:
+        if (lParam == WM_RBUTTONUP) { // 우클릭 했을 때
+            HMENU hMenu = CreatePopupMenu();
+            AppendMenuW(hMenu, MF_STRING, 2001, L"종료 (Exit)"); // ID: 2001
 
+            POINT pt;
+            GetCursorPos(&pt);
+            
+            // 트레이 메뉴 버그 방지용 (포커스 줬다가 뺏기)
+            SetForegroundWindow(hwnd); 
+            TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+            PostMessage(hwnd, WM_NULL, 0, 0);
+            
+            DestroyMenu(hMenu);
+        }
+        return 0;
+    
     case WM_PAINT: {
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hwnd, &ps);
@@ -258,24 +305,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_ERASEBKGND:
         return 1; // "내가 이미 다 지웠으니까 윈도우 너는 아무것도 하지 마" (깜빡임 원인 제거)
 
-    case WM_RBUTTONUP: {
-        // 1. 빈 팝업 메뉴 만들기
-        HMENU hMenu = CreatePopupMenu();
+    // case WM_RBUTTONUP: {
+    //     // 1. 빈 팝업 메뉴 만들기
+    //     HMENU hMenu = CreatePopupMenu();
         
-        // 2. 메뉴 항목 추가 (ID: 1001)
-        AppendMenuW(hMenu, MF_STRING, 1001, L"종료(Exit)");
+    //     // 2. 메뉴 항목 추가 (ID: 1001)
+    //     AppendMenuW(hMenu, MF_STRING, 1001, L"종료(Exit)");
         
-        // 3. 마우스 위치에 메뉴 띄우기
-        POINT pt;
-        GetCursorPos(&pt); // 현재 마우스 좌표 가져오기
+    //     // 3. 마우스 위치에 메뉴 띄우기
+    //     POINT pt;
+    //     GetCursorPos(&pt); // 현재 마우스 좌표 가져오기
         
-        // 메뉴 보여주고 선택 기다리기 (Blocking 아님)
-        SetForegroundWindow(hwnd); // 메뉴 띄우기 전 포커스 잡기 (버그 방지)
-        TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
+    //     // 메뉴 보여주고 선택 기다리기 (Blocking 아님)
+    //     SetForegroundWindow(hwnd); // 메뉴 띄우기 전 포커스 잡기 (버그 방지)
+    //     TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
         
-        DestroyMenu(hMenu); // 다 쓴 메뉴 껍데기 삭제
-        return 0;
-    }
+    //     DestroyMenu(hMenu); // 다 쓴 메뉴 껍데기 삭제
+    //     return 0;
+    // }
 
     // 1. 마우스 왼쪽 버튼 누름 (잡기 시작)
     case WM_LBUTTONDOWN: {
@@ -361,9 +408,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     }
 
     case WM_COMMAND: {
-        // 메뉴에서 무언가 선택했을 때 실행됨
-        if (LOWORD(wParam) == 1001) { // 아까 정한 ID가 1001이면
-            DestroyWindow(hwnd); // 종료
+        if (LOWORD(wParam) == 2001) { // ★ 트레이 메뉴 종료
+            DestroyWindow(hwnd);
         }
         return 0;
     }

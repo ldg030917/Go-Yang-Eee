@@ -10,6 +10,7 @@
 using namespace Gdiplus;
 
 #define WM_TRAYICON (WM_USER + 1) // 트레이 아이콘 메시지 ID
+#define ID_MY_ICON 101
 const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 
 // ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!
@@ -76,6 +77,7 @@ int maxFrame = ACTION_FRAMES[IDLE]; // 현재 행동의 최대 프레임 수
 // 전역 변수
 const wchar_t CLASS_NAME[] = L"MyDesktopPetClass";
 Image* petImage = nullptr;
+IStream* petStream = nullptr; // 스트림 보관용 (중요!)
 int currentFrame = 0; // 현재 보여줄 프레임 번호 (0 ~ FRAME_COUNT-1)
 
 void SetAction(int newAction) {
@@ -131,7 +133,7 @@ void InitTrayIcon(HWND hwnd) {
     nid.uCallbackMessage = WM_TRAYICON; // 이 메시지로 알림을 받겠다
     
     // 아이콘 로드 (본인 아이콘 있으면 LoadImage로 교체, 지금은 기본 느낌표 아이콘)
-    nid.hIcon = LoadIcon(NULL, IDI_APPLICATION); 
+    nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_MY_ICON)); 
     
     // 마우스 올렸을 때 툴팁
     lstrcpyW(nid.szTip, L"My Desktop Pet");
@@ -459,6 +461,36 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
+// 리소스에서 이미지를 불러오는 함수
+Image* LoadImageFromResource(HINSTANCE hInstance, int resId) {
+    // 1. 리소스 찾기
+    HRSRC hResource = FindResource(hInstance, MAKEINTRESOURCE(resId), RT_RCDATA);
+    if (!hResource) return nullptr;
+
+    // 2. 크기 확인 및 로드
+    DWORD imageSize = SizeofResource(hInstance, hResource);
+    HGLOBAL hGlobal = LoadResource(hInstance, hResource);
+    void* pData = LockResource(hGlobal);
+
+    // 3. 메모리 할당 및 복사
+    HGLOBAL hBuffer = GlobalAlloc(GMEM_MOVEABLE, imageSize);
+    if (!hBuffer) return nullptr;
+
+    void* pBuffer = GlobalLock(hBuffer);
+    CopyMemory(pBuffer, pData, imageSize);
+    GlobalUnlock(hBuffer);
+
+    // 4. 스트림 생성 (CreateStreamOnHGlobal)
+    if (CreateStreamOnHGlobal(hBuffer, TRUE, &petStream) == S_OK) {
+        Image* pImage = Image::FromStream(petStream);
+        return pImage;
+    }
+    
+    GlobalFree(hBuffer);
+    return nullptr;
+}
+
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow) {
     // ... (GdiplusStartup 부분 동일) ...
     GdiplusStartupInput gdiplusStartupInput;
@@ -516,7 +548,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 
     SetLayeredWindowAttributes(hwnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
 
-    petImage = Image::FromFile(L"pet.png");
+    petImage = LoadImageFromResource(hInstance, 102); 
 
     ShowWindow(hwnd, nCmdShow);
 
@@ -527,6 +559,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     }
 
     delete petImage;
+    if (petStream) petStream->Release();
     GdiplusShutdown(gdiplusToken);
     return 0;
 }

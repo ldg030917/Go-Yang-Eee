@@ -1,1 +1,2 @@
-MY_PET_PNG    RCDATA    "pet.png"
+101 ICON "icon.ico"
+102 RCDATA "pet.png"

@@ -18,14 +18,16 @@ const int FRAME_HEIGHT = 32;  // 프레임 1개의 세로 크기
 const int ANIM_SPEED = 100;   // 애니메이션 속도 (ms)
 const int PHYSICS_SPEED = 16; // ★ 추가: 물리 갱신 속도 (약 60 FPS)
 const float SCALE = 3.0f;   // 세 배로 키우기
-const int MOVE_SPEED = 10;
+const int MOVE_SPEED = 5;
 
 int speedX = 0; // 0: 정지, -5: 왼쪽, 5: 오른쪽
 int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
 
 float vy = 0.0f; // 수직 속도
-float gravity = 0.1f; // 중력 가속도
+float gravity = 0.8f; // 중력 가속도
 bool isJumping = false; // 점프/낙하 상태 확인용
+// ★ 전역 변수 추가 (애니메이션 시간 누적용)
+int animTimerAccumulator = 0;
 
 // 화면 크기 (나중에 화면 밖으로 나가는 거 막으려고)
 int screenW = GetSystemMetrics(SM_CXSCREEN);
@@ -148,55 +150,42 @@ void RemoveTrayIcon(HWND hwnd) {
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     switch (uMsg) {
     case WM_CREATE:
-        // ★ 타이머 시작 (ID: 1, 시간: ANIM_SPEED ms)
-        SetTimer(hwnd, 1, ANIM_SPEED, NULL);
+        // ★ 물리 엔진용 고속 타이머 (16ms = 60 FPS)
+        SetTimer(hwnd, 1, PHYSICS_SPEED, NULL); 
+        // SetTimer(hwnd, 1, ANIM_SPEED, NULL);
         InitTrayIcon(hwnd); // ★ 트레이 아이콘 등록
         return 0;
 
-    case WM_TIMER:
+        case WM_TIMER:
         if (wParam == 1) {
-            // -------------------------------------------------
-            // 1. 애니메이션 프레임 변경
-            // -------------------------------------------------
-            currentFrame = (currentFrame + 1) % maxFrame;
-
-            // -------------------------------------------------
-            // 2. AI 생각 (행동 결정)
-            // -------------------------------------------------
-            if (!isDragging) { // 드래그 중엔 생각 안 함
-                if (timeToThink > 0) timeToThink--;
-                else Think();
-            }
-
-            // -------------------------------------------------
-            // 3. 물리 엔진 (중력 & 이동 통합)
-            // -------------------------------------------------
+            // =================================================
+            // [영역 1] 물리 엔진 & 이동 (매번 실행 - 60 FPS)
+            // -> 아주 부드럽게 움직임
+            // =================================================
             if (!isDragging) {
-                // // (1) 작업 영역(바닥) 구하기
-                // RECT workArea;
-                // SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
-                // int floorY = workArea.bottom; // 바닥 좌표
+                // 1. 바닥 구하기
+                RECT workArea;
+                SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+                int floorY = workArea.bottom;
 
-                // // (2) 중력 적용 (Y축)
-                // vy += gravity;
-                // posY += (int)vy;
+                // 2. 중력 (Y축)
+                vy += gravity;
+                posY += (int)vy;
 
-                // // 바닥 충돌 처리
-                // if (posY + winH >= floorY) { // winH(전역변수) 사용
-                //     posY = floorY - winH; // 바닥에 착지
-                //     vy = 0.0f;
-                    
-                //     // 떨어지다가 착지했으면 IDLE로 복귀 (점프 모션 끝)
-                //     if (currentAction == JUMP && isJumping) {
-                //          isJumping = false;
-                //          SetAction(IDLE);
-                //     }
-                // }
+                // 바닥 충돌
+                if (posY + winH >= floorY) {
+                    posY = floorY - winH;
+                    vy = 0.0f;
+                    if (currentAction == JUMP && isJumping) {
+                         isJumping = false;
+                         SetAction(IDLE);
+                    }
+                }
 
-                // (3) 좌우 이동 적용 (X축)
+                // 3. 좌우 이동 (X축)
                 posX += speedX;
 
-                // (4) 벽 충돌 처리 (X축)
+                // 벽 충돌
                 bool hitWall = false;
                 if (posX <= 0) {
                     posX = 0;
@@ -209,27 +198,47 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
                 if (hitWall && speedX != 0) {
                     speedX = 0;
-                    SetAction(PAW); // 벽 긁기
-                    timeToThink = 20;
+                    SetAction(PAW);
+                    timeToThink = 20; // 생각 시간도 조정 필요할 수 있음
                 }
 
-                // (5) 최종 위치 반영 (한 번만 호출)
+                // ★ 위치 반영 (매 프레임 부드럽게)
                 SetWindowPos(hwnd, NULL, posX, posY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
             }
 
-            // 4. 화면 다시 그리기
-            InvalidateRect(hwnd, NULL, TRUE);
-            
-            // (쓰다듬기 게이지 감소 로직은 여기 아래에 그대로 두시면 됩니다)
-            if (rubCount > 0) {
-                rubDecayTimer++;
-                if (rubDecayTimer > 10) { // 10프레임(약 1초) 동안 안 쓰다듬으면
-                    rubCount -= 10;
-                    if (rubCount < 0) rubCount = 0;
+            // =================================================
+            // [영역 2] 애니메이션 & AI (가끔 실행 - 10 FPS)
+            // -> 그림은 천천히 바뀌어야 귀여움 (레트로 감성)
+            // =================================================
+            animTimerAccumulator += PHYSICS_SPEED; // 시간 누적 (16씩 더함)
+
+            if (animTimerAccumulator >= ANIM_SPEED) { // 100 이상 쌓이면 실행
+                animTimerAccumulator = 0; // 초기화
+
+                // 1. 프레임 넘기기
+                currentFrame = (currentFrame + 1) % maxFrame;
+
+                // 2. AI 생각 (이동 중이 아닐 때만)
+                if (!isDragging) {
+                    if (timeToThink > 0) timeToThink--;
+                    else Think();
+                }
+                
+                // 3. 쓰다듬기 게이지 감소
+                if (rubCount > 0) {
+                    rubDecayTimer++;
+                    if (rubDecayTimer > 10) {
+                        rubCount -= 10;
+                        if (rubCount < 0) rubCount = 0;
+                    }
                 }
             }
+
+            // 화면 갱신 요청 (매 프레임)
+            InvalidateRect(hwnd, NULL, FALSE); // TRUE 대신 FALSE 권장 (깜빡임 최소화)
         }
         return 0;
+
 
 
     case WM_DESTROY:

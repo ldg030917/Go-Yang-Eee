@@ -12,7 +12,7 @@ using namespace Gdiplus;
 const int FRAME_WIDTH = 32;   // 프레임 1개의 가로 크기
 const int FRAME_HEIGHT = 32;  // 프레임 1개의 세로 크기
 const int ANIM_SPEED = 100;   // 애니메이션 속도 (ms)
-const float SCALE = 3.0f;   // 두 배로 키우기
+const float SCALE = 5.0f;   // 두 배로 키우기
 const int MOVE_SPEED = 10;
 
 int speedX = 0; // 0: 정지, -5: 왼쪽, 5: 오른쪽
@@ -22,7 +22,16 @@ int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
 int screenW = GetSystemMetrics(SM_CXSCREEN);
 int screenH = GetSystemMetrics(SM_CYSCREEN);
 
+int debugDX = 0;
+int debugDY = 0;
+
 bool isLookingRight = true; // true: 오른쪽, false: 왼쪽
+
+int rubCount = 0;        // 문지른 횟수 (게이지)
+int lastCursorX = 0;     // 마우스 움직임 계산용
+int lastCursorY = 0;
+const int RUB_THRESHOLD = 250; // 이만큼 문지르면 기분 좋아짐
+int rubDecayTimer = 0; // 쓰다듬기 게이지 감소 타이머
 
 bool isDragging = false; // 지금 잡혀있는지?
 POINT dragOffset;
@@ -156,6 +165,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // 화면 전체를 다시 그리라고 요청 (WM_PAINT 유발)
             InvalidateRect(hwnd, NULL, TRUE); 
         }
+        // 쓰다듬기 게이지 관리
+        if (rubCount > 0) {
+            rubDecayTimer++;
+            if (rubDecayTimer > 10) {   // 10프레임(약 1초) 동안 안 쓰다듬으면
+                rubCount -= 10;
+                if (rubCount < 0) rubCount = 0;
+            }
+        }
         return 0;
 
     case WM_DESTROY:
@@ -209,6 +226,24 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
         // 4. 완성된 그림을 실제 화면에 복사 (BitBlt)
         BitBlt(hdc, 0, 0, w, h, memDC, 0, 0, SRCCOPY);
+
+        // // --- 디버깅용 텍스트 출력 ---
+        // HFONT hFont = CreateFontW(20, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Arial");
+        // HGDIOBJ oldFont = SelectObject(hdc, hFont);
+        // SetTextColor(hdc, RGB(0, 0, 0)); // 검은색 글씨
+        // SetBkMode(hdc, TRANSPARENT);
+
+        // WCHAR debugText[100];
+        // // 현재 누적치 / 순간변화량 dx / 순간변화량 dy
+        // // (dx, dy 변수를 전역으로 빼거나, static으로 선언해서 가져와야 함. 
+        // //  일단 편하게 rubCount만 찍는 게 아니라, lastCursorX도 찍어봅시다)
+
+        // // 가장 쉬운 방법: WM_MOUSEMOVE에서 계산한 dx, dy를 전역 변수에 저장해두고 여기서 출력
+        // // 전역 변수 추가: int debugDX = 0, debugDY = 0;
+
+        // wsprintfW(debugText, L"Rub:%d / dx:%d dy:%d", rubCount, debugDX, debugDY);
+
+        // TextOutW(hdc, 0, 0, debugText, lstrlenW(debugText));
 
         // 5. 정리
         SelectObject(memDC, oldBitmap);
@@ -268,10 +303,14 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     // 2. 마우스 움직임 (드래그 중)
     case WM_MOUSEMOVE: {
-        if (isDragging) {
-            POINT pt;
-            GetCursorPos(&pt); // 현재 마우스 위치(전체화면 기준)
-            
+        POINT pt;
+        GetCursorPos(&pt); // 현재 마우스 위치(전체화면 기준)
+        int dx = abs(pt.x - lastCursorX);
+        int dy = abs(pt.y - lastCursorY);
+        debugDX = dx;
+        debugDY = dy;
+        // WM_MOUSEMOVE 안에서 테스트용
+        if (isDragging) {            
             // 새 위치 = 현재 마우스 - 아까 저장한 오차
             int newX = pt.x - dragOffset.x;
             int newY = pt.y - dragOffset.y;
@@ -279,6 +318,30 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // 창 위치 옮기기
             SetWindowPos(hwnd, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
+        else {
+            // 마우스가 고양이 창 영역 안에 있는지 확인 (이미 WM_MOUSEMOVE는 창 위에서만 발생하므로 생략 가능하지만 안전하게)
+            // 이전 좌표와 비교해서 얼마나 움직였나 계산 (거리)
+            int dx = abs(pt.x - lastCursorX);
+            int dy = abs(pt.y - lastCursorY);
+            
+            // 너무 조금 움직인 건 무시(떨림 방지), 너무 확 움직인 건 텔레포트니까 무시
+            if (dx + dy > 0 && dx + dy < 100) {
+                rubCount += (dx + dy); // 움직인 거리만큼 게이지 충전
+                InvalidateRect(hwnd, NULL, FALSE);
+                // 게이지가 다 찼다면? -> 행복 모드 발동!
+                if (rubCount > RUB_THRESHOLD) { // 감도 조절 필요
+                    if (currentAction != SLEEP && currentAction != PAW) { // 자거나 긁을 땐 방해 X
+                        SetAction(CLEAN2); // 그루밍(CLEAN)이나 행복한 표정으로 변경
+                        speedX = 0;
+                        timeToThink = 20; // 5초 동안 기분 느낌
+                        rubCount = 0;     // 게이지 초기화
+                    }
+                }
+            }
+        }
+        // 현재 좌표 기억 (다음 계산용)
+        lastCursorX = pt.x;
+        lastCursorY = pt.y;
         return 0;
     }
 

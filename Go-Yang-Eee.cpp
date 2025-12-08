@@ -10,6 +10,9 @@ using namespace Gdiplus;
 
 #define WM_TRAYICON (WM_USER + 1) // 트레이 아이콘 메시지 ID
 #define ID_MY_ICON 101
+#define ID_EXIT 2001
+#define ID_ADD_CAT 2002
+#define ID_REMOVE_CAT 2003
 const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 
 // ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!
@@ -314,19 +317,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     if (!pCat) return DefWindowProc(hwnd, uMsg, wParam, lParam);
 
     switch (uMsg) {
-    case WM_TIMER: {
-        if (wParam == 999) { // 비상용 타이머 ID: 999
-            // 드래그 중이라 메인 루프가 멈췄을 때, 여기서 강제로 돌린다!
-            
-            // 모든 고양이 업데이트 & 그리기
-            // (주의: cats 벡터는 전역변수라 접근 가능)
-            for (Cat* c : cats) {
-                c->Update();
-                if(c->hwnd) InvalidateRect(c->hwnd, NULL, FALSE);
-            }
-        }
-        return 0;
-    }
+    //case WM_TIMER: {
+    //     if (wParam == 999) { // 비상용 타이머 ID: 999
+    //         // 드래그 중이라 메인 루프가 멈췄을 때, 여기서 강제로 돌린다!       
+    //         // 모든 고양이 업데이트 & 그리기
+    //         // (주의: cats 벡터는 전역변수라 접근 가능)
+    //         for (Cat* c : cats) {
+    //             c->Update();
+    //             if(c->hwnd) InvalidateRect(c->hwnd, NULL, FALSE);
+    //         }
+    //     }
+    //     return 0;
+    // }
 
     case WM_DESTROY: {
         RemoveTrayIcon(hwnd);
@@ -335,14 +337,21 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // 주의: PostQuitMessage(0)를 호출하면 프로그램 전체가 꺼집니다.
         // 창이 하나 닫힐 때 "모든 창이 다 닫혔는지" 확인하고 종료해야 합니다.
         // 일단은 창 하나 닫으면 프로그램 종료되게 둡니다.
-        PostQuitMessage(0);
+        if (cats.empty()) {
+            PostQuitMessage(0);
+        }
         return 0;
     }
     
     case WM_TRAYICON: {
         if (lParam == WM_RBUTTONUP) {
             HMENU hMenu = CreatePopupMenu();
-            AppendMenuW(hMenu, MF_STRING, 2001, L"종료 (Exit)");
+
+            AppendMenuW(hMenu, MF_STRING, ID_ADD_CAT, L"고양이 추가 (+)");
+            AppendMenuW(hMenu, MF_STRING, ID_REMOVE_CAT, L"고양이 보내기 (-)");
+            AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL); // 줄 긋기
+            AppendMenuW(hMenu, MF_STRING, ID_EXIT, L"종료 (Exit)");
+
             POINT pt; GetCursorPos(&pt);
             SetForegroundWindow(hwnd); 
             TrackPopupMenu(hMenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, NULL);
@@ -414,10 +423,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         pCat->dragOffset.y = pt.y - rect.top;
         
         SetCapture(hwnd);
-
-        // ★ 비상용 타이머 가동! (16ms = 60FPS)
-        // 어떤 고양이를 잡든 상관없이, 잡는 순간 타이머를 켜서 전체 월드를 돌림
-        SetTimer(hwnd, 999, 16, NULL); 
         return 0;
     }
 
@@ -475,18 +480,70 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ReleaseCapture();
             pCat->SetAction(IDLE); 
             pCat->timeToThink = 30;
-            // ★ 비상용 타이머 해제
-            KillTimer(hwnd, 999);
         }
         return 0;
     }
 
     case WM_COMMAND: {
-        if (LOWORD(wParam) == 2001) {
-            DestroyWindow(hwnd);
+        int id = LOWORD(wParam);
+        
+        switch (id) {
+        case ID_EXIT:
+            // 모든 고양이 정리 후 종료하는 게 안전함
+            PostQuitMessage(0); 
+            break;
+
+        case ID_ADD_CAT: {
+            // [고양이 추가]
+            RECT workArea; 
+            SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+            
+            // 약간 랜덤한 위치에 스폰 (겹침 방지)
+            int startX = (workArea.right / 2) + (rand() % 200 - 100);
+            int startY = workArea.bottom - 200;
+            int type = (rand() % 2 == 0) ? 102 : 103;
+            
+            HINSTANCE hInst = GetModuleHandle(NULL);
+            Cat* newCat = new Cat(startX, startY, type, hInst);
+            
+            newCat->hwnd = CreateWindowExW(
+                WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+                CLASS_NAME, L"My Pet", WS_POPUP,
+                newCat->posX, newCat->posY, winW, winH,
+                NULL, NULL, hInst, newCat
+            );
+            
+            SetLayeredWindowAttributes(newCat->hwnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
+            ShowWindow(newCat->hwnd, SW_SHOW);
+            
+            cats.push_back(newCat);
+            break;
         }
+
+        case ID_REMOVE_CAT: {
+            // [고양이 삭제]
+            if (!cats.empty()) {
+                Cat* victim = cats.back(); // 마지막 녀석 선택
+                
+                // 윈도우 파괴
+                if (victim->hwnd) DestroyWindow(victim->hwnd);
+                
+                // 메모리 정리
+                if (victim->myImage) delete victim->myImage;
+                if (victim->myStream) victim->myStream->Release();
+                delete victim;
+                
+                cats.pop_back(); // 리스트에서 제거
+                
+                // 0마리 되면 종료할지? (선택사항)
+                // if (cats.empty()) PostQuitMessage(0);
+            }
+            break;
+        }
+        } // end switch
         return 0;
     }
+
 
     }
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
@@ -528,7 +585,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     int startX = workArea.right - winW - 500;
     int startY = workArea.bottom - winH;
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 1; i++) {
         // (1) 고양이 객체 생성
         // 리소스 ID: 랜덤
         int resId = rand() % 2 == 1 ? 103 : 102; 

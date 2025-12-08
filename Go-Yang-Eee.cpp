@@ -6,6 +6,8 @@
 #include <shellapi.h> // Shell_NotifyIcon 용
 #include <vector>
 
+//taskkill /IM Go-Yang-Eee.exe /F
+
 using namespace Gdiplus;
 
 #define WM_TRAYICON (WM_USER + 1) // 트레이 아이콘 메시지 ID
@@ -353,7 +355,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_DESTROY: {
         RemoveTrayIcon(hwnd);
         KillTimer(hwnd, 1);
-        
+
         if (cats.empty()) {
             UnregisterHotKey(hwnd, ID_HOTKEY_ADD); // 해제
             UnregisterHotKey(hwnd, ID_HOTKEY_REMOVE);
@@ -513,6 +515,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 if (c->hwnd) DestroyWindow(c->hwnd);
             }
             cats.clear(); // 바로 비워서 WM_DESTROY에서 empty() 체크 통과하게 함
+            PostQuitMessage(0);
             break;
 
         case ID_ADD_CAT: {
@@ -546,19 +549,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // [고양이 삭제]
             if (!cats.empty()) {
                 Cat* victim = cats.back(); // 마지막 녀석 선택
-                
+                cats.pop_back(); // 리스트에서 제거
                 // 윈도우 파괴
                 if (victim->hwnd) DestroyWindow(victim->hwnd);
                 
                 // 메모리 정리
                 if (victim->myImage) delete victim->myImage;
                 if (victim->myStream) victim->myStream->Release();
-                delete victim;
-                
-                cats.pop_back(); // 리스트에서 제거
+                delete victim;                
                 
                 // 0마리 되면 종료할지? (선택사항)
-                // if (cats.empty()) PostQuitMessage(0);
+                if (cats.empty()) PostQuitMessage(0);
             }
             break;
         }
@@ -691,6 +692,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     cats.clear();
 
     GdiplusShutdown(gdiplusToken);
+    //MessageBoxW(NULL, L"정상 종료됨", L"알림", MB_OK); // 이거 뜨면 정상
     return 0;
 }
 

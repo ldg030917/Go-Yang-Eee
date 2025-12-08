@@ -13,6 +13,8 @@ using namespace Gdiplus;
 #define ID_EXIT 2001
 #define ID_ADD_CAT 2002
 #define ID_REMOVE_CAT 2003
+#define ID_HOTKEY_ADD 9001
+#define ID_HOTKEY_REMOVE 9002
 const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 
 // ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!
@@ -200,7 +202,7 @@ struct Cat {
             speedX = (rand() % 2 == 0) ? -MOVE_SPEED : MOVE_SPEED;
             if (energy > 80) speedX *= 1.5; // 광란의 질주
             isLookingRight = (speedX > 0);
-            timeToThink = 20 + (100 - energy); // 에너지가 많으면 금방 다음 행동 함
+            timeToThink = 10 + rand() % (100 - energy); // 에너지가 많으면 금방 다음 행동 함
         }
         else if (choice < idleW + moveW + sleepW) {
             // 잠자기
@@ -323,46 +325,38 @@ void RemoveTrayIcon(HWND hwnd) {
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     Cat* pCat = NULL;
-
     if (uMsg == WM_CREATE) {
-        // 창 만들 때 넘겨준 Cat 포인터를 받아서 저장
         CREATESTRUCT* pCreate = (CREATESTRUCT*)lParam;
         pCat = (Cat*)pCreate->lpCreateParams;
         SetWindowLongPtr(hwnd, GWLP_USERDATA, (LONG_PTR)pCat);
         
-        if (cats.empty()) InitTrayIcon(hwnd); 
+        static bool isFirstWindow = true;
+        if (isFirstWindow) {
+            isFirstWindow = false;
+            InitTrayIcon(hwnd);
+            // 핫키 등록...
+            RegisterHotKey(hwnd, ID_HOTKEY_ADD, MOD_CONTROL | MOD_ALT, 'C');
+            RegisterHotKey(hwnd, ID_HOTKEY_REMOVE, MOD_CONTROL | MOD_ALT, 'D');
+        }
         return 0;
     }
     else {
-        // 저장된 Cat 포인터 꺼내기
+        // WM_CREATE가 아니면 저장된 포인터를 꺼내옴
         pCat = (Cat*)GetWindowLongPtr(hwnd, GWLP_USERDATA);
     }
 
-    // 만약 Cat 포인터가 없으면 (초기화 전 메시지 등) 기본 처리
-    if (!pCat) return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    // ★ 안전장치: pCat이 없으면(NULL) 아무것도 하지 말고 기본 처리
+    // (이거 없으면 WM_PAINT 등에서 터짐)
+    if (!pCat) return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 
     switch (uMsg) {
-    //case WM_TIMER: {
-    //     if (wParam == 999) { // 비상용 타이머 ID: 999
-    //         // 드래그 중이라 메인 루프가 멈췄을 때, 여기서 강제로 돌린다!       
-    //         // 모든 고양이 업데이트 & 그리기
-    //         // (주의: cats 벡터는 전역변수라 접근 가능)
-    //         for (Cat* c : cats) {
-    //             c->Update();
-    //             if(c->hwnd) InvalidateRect(c->hwnd, NULL, FALSE);
-    //         }
-    //     }
-    //     return 0;
-    // }
-
     case WM_DESTROY: {
         RemoveTrayIcon(hwnd);
         KillTimer(hwnd, 1);
         
-        // 주의: PostQuitMessage(0)를 호출하면 프로그램 전체가 꺼집니다.
-        // 창이 하나 닫힐 때 "모든 창이 다 닫혔는지" 확인하고 종료해야 합니다.
-        // 일단은 창 하나 닫으면 프로그램 종료되게 둡니다.
         if (cats.empty()) {
+            UnregisterHotKey(hwnd, ID_HOTKEY_ADD); // 해제
+            UnregisterHotKey(hwnd, ID_HOTKEY_REMOVE);
             PostQuitMessage(0);
         }
         return 0;
@@ -372,8 +366,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         if (lParam == WM_RBUTTONUP) {
             HMENU hMenu = CreatePopupMenu();
 
-            AppendMenuW(hMenu, MF_STRING, ID_ADD_CAT, L"고양이 추가 (+)");
-            AppendMenuW(hMenu, MF_STRING, ID_REMOVE_CAT, L"고양이 보내기 (-)");
+            AppendMenuW(hMenu, MF_STRING, ID_ADD_CAT, L"고양이 추가 (CTRL+ALT+C)");
+            AppendMenuW(hMenu, MF_STRING, ID_REMOVE_CAT, L"고양이 보내기 (CTRL+ALT+D)");
             AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL); // 줄 긋기
             AppendMenuW(hMenu, MF_STRING, ID_EXIT, L"종료 (Exit)");
 
@@ -515,7 +509,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         switch (id) {
         case ID_EXIT:
             // 모든 고양이 정리 후 종료하는 게 안전함
-            PostQuitMessage(0); 
+            for (Cat* c : cats) {
+                if (c->hwnd) DestroyWindow(c->hwnd);
+            }
+            cats.clear(); // 바로 비워서 WM_DESTROY에서 empty() 체크 통과하게 함
             break;
 
         case ID_ADD_CAT: {
@@ -569,6 +566,17 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         return 0;
     }
 
+    case WM_HOTKEY: {
+        if (wParam == ID_HOTKEY_ADD) {
+            // 고양이 추가 로직 실행!
+            // (코드를 복사하지 말고, WM_COMMAND를 강제로 호출하는 게 깔끔함)
+            SendMessage(hwnd, WM_COMMAND, ID_ADD_CAT, 0);
+        }
+        else if (wParam == ID_HOTKEY_REMOVE) {
+            SendMessage(hwnd, WM_COMMAND, ID_REMOVE_CAT, 0);
+        }
+        return 0;
+    }
 
     }
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);

@@ -120,6 +120,11 @@ struct Cat {
     Image* myImage = nullptr; // 자기만의 이미지 포인터 (혹은 공유 가능)
     IStream* myStream = nullptr;
 
+    // 성격 스텟
+    int energy; // 활동성
+    int friendliness; // 친화력
+    int lazy; // 게으름
+
     // 쓰다듬기 관련 (개별 관리)
     int rubCount = 0;
     int rubDecayTimer = 0;
@@ -142,7 +147,23 @@ struct Cat {
         timeToThink = rand() % 50;
         animTimer = rand() % 100; // 서로 다르게 움직이게 오프셋
         animTimerAccumulator = rand() % ANIM_SPEED; // 초기값 랜덤 (서로 다르게 깜빡이게)
-
+        switch (type) {
+        case 102: // 흰 냥
+            energy = 20 + (rand() % 10);
+            friendliness = 20 + (rand() % 40);
+            lazy = 70 + (rand() % 30);
+            break;
+        case 103: // 샴
+            energy = 40 + (rand() % 30);
+            friendliness = 60 + (rand() % 20);
+            lazy = 20 + (rand() % 10);
+            break;
+        default:
+            energy = 50;
+            friendliness = 50;
+            lazy = 50;
+            break;
+        }
         // 이미지 로딩 (함수 재사용)
         myImage = LoadImageFromResource(hInstance, catType, &myStream); 
     }
@@ -158,36 +179,40 @@ struct Cat {
     void Think() {
         if (isDragging) return;
         // 랜덤으로 다음 행동 결정 (0: IDLE, 1: WALK_LEFT, 2: WALK_RIGHT)
-        int choice = rand() % 5; 
-        // 다음 생각할 시간 설정 (예: 20~50 프레임 뒤에 다시 생각)
-        timeToThink = 20 + (rand() % 30);
-        switch (choice) {
-        case 0: // 가만히 있기
+
+        int idleW = lazy * 2;
+        int moveW = energy * 2;
+        int sleepW = (100 - energy);
+        int cleanW = friendliness;
+
+        int totalW = idleW + moveW + sleepW + cleanW;
+        int choice = rand() % totalW;
+
+        if (choice < idleW) {
+            // 가만히 있기
             SetAction((rand()%2 == 0) ? IDLE : IDLE2);
             speedX = 0;
-            break;
-
-        case 1: // 왼쪽으로 걷기
-            SetAction((rand()%2 == 0) ? MOVE : MOVE2); // 걷는 모션
-            speedX = -MOVE_SPEED;     // 왼쪽 이동
-            isLookingRight = false;
-            timeToThink = 10 + (rand() % 20);
-            break;
-
-        case 2: // 오른쪽으로 걷기
+            timeToThink = 30 + lazy;
+        }
+        else if (choice < idleW + moveW) {
+            // 이동
             SetAction((rand()%2 == 0) ? MOVE : MOVE2);
-            speedX = MOVE_SPEED;      // 오른쪽 이동
-            isLookingRight = true;
-            timeToThink = 10 + (rand() % 20);
-            break;
-        case 3: // 잠자기
+            speedX = (rand() % 2 == 0) ? -MOVE_SPEED : MOVE_SPEED;
+            if (energy > 80) speedX *= 1.5; // 광란의 질주
+            isLookingRight = (speedX > 0);
+            timeToThink = 20 + (100 - energy); // 에너지가 많으면 금방 다음 행동 함
+        }
+        else if (choice < idleW + moveW + sleepW) {
+            // 잠자기
             SetAction(SLEEP);
             speedX = 0;
-            break;
-        case 4: // 누워있기
-            SetAction((rand()%10 >= 8) ? LIE : YAWN);
+            timeToThink = 100 + (lazy * 2);
+        }
+        else {
+            // [그루밍/기타]
+            SetAction((rand() % 2 == 0) ? CLEAN : CLEAN2);
             speedX = 0;
-            break;
+            timeToThink = 20 + rand() % 40;
         }
     }
 

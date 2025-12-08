@@ -1,15 +1,25 @@
-// ... (위쪽 헤더는 동일) ...
 #include <windows.h>
 #include <gdiplus.h>
 #include <time.h> // 맨 위에 추가
 #include <shlwapi.h> // IStream 변환용 (필요시)
 #include <shellapi.h> // Shell_NotifyIcon 용
 #include <vector>
+#include <wininet.h>
+#include <stdio.h>
+#pragma comment(lib, "wininet.lib")
 
 //taskkill /IM Go-Yang-Eee.exe /F
 
 using namespace Gdiplus;
 
+// 내 버전
+#define VER_MAJOR 1
+#define VER_MINOR 2
+#define VER_PATCH 11
+// 버전 파일이 있는 URL (Raw 텍스트여야 함)
+#define VERSION_URL L"https://gist.githubusercontent.com/ldg030917/f1ba0b5ebcb8c276ddff2b7c6ecbab54/raw/version.txt"
+// 다운로드 페이지 URL
+#define DOWNLOAD_URL L"https://ldg030917.itch.io/go-yang-eee"
 #define WM_TRAYICON (WM_USER + 1) // 트레이 아이콘 메시지 ID
 #define ID_MY_ICON 101
 #define ID_EXIT 2001
@@ -103,6 +113,52 @@ Image* LoadImageFromResource(HINSTANCE hInstance, int resId, IStream** outStream
     
     GlobalFree(hBuffer);
     return nullptr;
+}
+
+// 버전 체크 함수
+void CheckForUpdate(HWND hwnd) {
+    HINTERNET hInternet, hFile;
+    char buffer[1024];
+    DWORD bytesRead;
+
+    // 1. 인터넷 연결 초기화
+    hInternet = InternetOpenW(L"MyPetUpdater", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+    if (!hInternet) return; // 인터넷 안 되면 조용히 넘어감
+
+    // 2. 버전 파일 읽기
+    hFile = InternetOpenUrlW(hInternet, VERSION_URL, NULL, 0, INTERNET_FLAG_RELOAD, 0);
+    if (hFile) {
+        if (InternetReadFile(hFile, buffer, sizeof(buffer) - 1, &bytesRead)) {
+            buffer[bytesRead] = '\0'; // 문자열 끝 처리
+            
+            // 줄바꿈 문자 제거 (혹시 모르니)
+            char* p = strchr(buffer, '\n'); if(p) *p = 0;
+            p = strchr(buffer, '\r'); if(p) *p = 0;
+
+            int sMajor=0, sMinor=0, sPatch=0;
+            // %d.%d.%d 패턴으로 숫자 3개 추출 (실패 시 0)
+            sscanf(buffer, "%d.%d.%d", &sMajor, &sMinor, &sPatch);
+
+            // 버전 비교 (앞에서부터 차례대로)
+            bool update = false;
+            if (sMajor > VER_MAJOR) update = true;
+            else if (sMajor == VER_MAJOR && sMinor > VER_MINOR) update = true;
+            else if (sMajor == VER_MAJOR && sMinor == VER_MINOR && sPatch > VER_PATCH) update = true;
+
+            if (update) {
+                // 업데이트 발견!
+                WCHAR msg[256];
+                wsprintfW(msg, L"새로운 버전(%S)이 있습니다!\n지금 다운로드 하시겠습니까?", buffer);
+                
+                if (MessageBoxW(hwnd, msg, L"업데이트 알림", MB_YESNO | MB_ICONASTERISK) == IDYES) {
+                    // 웹브라우저 열기
+                    ShellExecuteW(NULL, L"open", DOWNLOAD_URL, NULL, NULL, SW_SHOWNORMAL);
+                }
+            }
+        }
+        InternetCloseHandle(hFile);
+    }
+    InternetCloseHandle(hInternet);
 }
 
 struct Cat {
@@ -599,6 +655,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = CreateSolidBrush(RGB(255, 0, 255));
     wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(ID_MY_ICON));
+    
+    // 업데이트 확인
+    CheckForUpdate(NULL); 
 
     RegisterClassExW(&wc);
 

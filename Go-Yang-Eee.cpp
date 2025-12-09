@@ -53,8 +53,6 @@ int winH = 0; // 창 세로 크기 (계산된 값)
 int debugDX = 0;
 int debugDY = 0;
 
-int lastCursorX = 0;     // 마우스 움직임 계산용
-int lastCursorY = 0;
 const int RUB_THRESHOLD = 250; // 이만큼 문지르면 기분 좋아짐
 
 enum ActionType {
@@ -164,8 +162,9 @@ void CheckForUpdate(HWND hwnd) {
 struct Cat {
     HWND hwnd = NULL;  //고양이만의 창(window)
     int posX = 0, posY = 0; // 현재 고양이 위치
-    int speedX = 0; // 0: 정지, -5: 왼쪽, 5: 오른쪽
-    float vy = 0.0f; // 수직 속도
+    float speedX = 0.0f; // 0: 정지, -5: 왼쪽, 5: 오른쪽
+    float speedY = 0.0f; // 수직 속도
+    float targetSpeedX = 0.0f;
     int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
     bool isJumping = false; // 점프/낙하 상태 확인용
     bool isLookingRight = true;
@@ -173,6 +172,9 @@ struct Cat {
     int currentFrame = 0;
     int maxFrame = ACTION_FRAMES[IDLE];
     int animTimerAccumulator;
+    float angle = 0.0f; // 현재 회전 각도
+    float swingSpeed = 0.0f; // 흔들림 속도
+    int lastCursorX, lastCursorY;
 
     // 2. 개별 속성 (고양이마다 다르게 줄 수 있음)
     int animTimer; // 애니메이션 타이머 (개별 동작 위해)
@@ -191,15 +193,12 @@ struct Cat {
 
     bool isDragging; // 드래그 확인용
     POINT dragOffset;
+    float throwSpeedX = 0.0f, throwSpeedY = 0.0f;
 
     Cat(int startX, int startY, int type, HINSTANCE hInstance) {
         posX = startX;
         posY = startY;
         catType = type;
-        vy = 0;
-        speedX = 0;
-        isJumping = false;
-        isLookingRight = true;
         isDragging = false;
         currentAction = IDLE;
         currentFrame = 0;
@@ -251,27 +250,27 @@ struct Cat {
         if (choice < idleW) {
             // 가만히 있기
             SetAction((rand()%2 == 0) ? IDLE : IDLE2);
-            speedX = 0;
+            targetSpeedX = 0;
             timeToThink = 30 + lazy;
         }
         else if (choice < idleW + moveW) {
             // 이동
             SetAction((rand()%2 == 0) ? MOVE : MOVE2);
-            speedX = (rand() % 2 == 0) ? -MOVE_SPEED : MOVE_SPEED;
-            if (energy > 80) speedX *= 1.5; // 광란의 질주
-            isLookingRight = (speedX > 0);
+            targetSpeedX = (rand() % 2 == 0) ? -MOVE_SPEED : MOVE_SPEED;
+            if (energy > 80) targetSpeedX *= 1.5; // 광란의 질주
+            isLookingRight = (targetSpeedX > 0);
             timeToThink = 10 + rand() % (100 - energy); // 에너지가 많으면 금방 다음 행동 함
         }
         else if (choice < idleW + moveW + sleepW) {
             // 잠자기
             SetAction(SLEEP);
-            speedX = 0;
+            targetSpeedX = 0;
             timeToThink = 100 + (lazy * 2);
         }
         else {
             // [그루밍/기타]
             SetAction((rand() % 2 == 0) ? CLEAN : CLEAN2);
-            speedX = 0;
+            targetSpeedX = 0;
             timeToThink = 20 + rand() % 40;
         }
     }
@@ -280,27 +279,42 @@ struct Cat {
         // [물리 엔진 로직 이동]
         // WindowProc에 있던 pCat->posX += ... 코드들을 여기에 복사
         // hwnd 대신 this->hwnd, pCat-> 대신 this-> 사용
-        
+        if (isDragging) {
+            // 행잉
+            //float force =
+        }
         // [영역 1] 물리 엔진 & 이동 (매번 실행)
-        if (!isDragging) {
+        else {
             RECT workArea;
             SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
             int floorY = workArea.bottom;
+            float friction = (posY + winH >= floorY) ? 0.5f : 0.05f;
+
+            // // 마찰력 적용 (감속)
+            // if (speedX > 0) {
+            //     speedX -= friction;
+            //     if (speedX < 0) speedX = 0;
+            // } else if (speedX < 0) {
+            //     speedX += friction;
+            //     if (speedX > 0) speedX = 0;
+            // }
 
             // 중력 적용 (pCat 변수 사용)
-            vy += gravity;
-            posY += (int)vy;
+            speedY += gravity;
+            posY += (int)speedY;
 
             // 바닥 충돌
             if (posY + winH >= floorY) {
                 posY = floorY - winH;
-                vy = 0.0f;
+                speedX = 0.0f;
+                speedY = 0.0f;
                 if (currentAction == JUMP && isJumping) {
                     isJumping = false;
                     SetAction(IDLE); // 멤버 함수 호출
                 }
             }
 
+            if (targetSpeedX != 0) speedX = targetSpeedX;
             // 좌우 이동
             posX += speedX;
 
@@ -316,7 +330,7 @@ struct Cat {
             }
 
             if (hitWall && speedX != 0) {
-                speedX = 0;
+                targetSpeedX = 0;
                 SetAction(PAW);
                 timeToThink = 20; 
             }
@@ -498,6 +512,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // 구조체 멤버 dragOffset 사용
         pCat->dragOffset.x = pt.x - rect.left;
         pCat->dragOffset.y = pt.y - rect.top;
+        pCat->lastCursorX = pt.x;
+        pCat->lastCursorY = pt.y;
         
         SetCapture(hwnd);
         return 0;
@@ -517,7 +533,11 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             
             pCat->posX = newX;
             pCat->posY = newY;
-            pCat->vy = 0.0f;
+            pCat->speedY = 0.0f;
+
+            // 던지기 속도 계산
+            pCat->throwSpeedX = (float)(pt.x - pCat->lastCursorX);
+            pCat->throwSpeedY = (float)(pt.y - pCat->lastCursorY);
             // 좌표가 화면 밖으로 튀면 소리 재생 + 복구
             if (newX < -200 || newX > 5000) {
                 MessageBeep(MB_ICONHAND); // 경고음!
@@ -529,8 +549,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
         else {
             // 쓰다듬기 로직 (간소화)
-            int dx = abs(pt.x - lastCursorX); // 전역 변수 사용 (주의)
-            int dy = abs(pt.y - lastCursorY);
+            int dx = abs(pt.x - pCat->lastCursorX); // 전역 변수 사용 (주의)
+            int dy = abs(pt.y - pCat->lastCursorY);
             
             if (dx + dy > 0 && dx + dy < 100) {
                 pCat->rubCount += (dx + dy);
@@ -546,8 +566,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 }
             }
         }
-        lastCursorX = pt.x;
-        lastCursorY = pt.y;
+        pCat->lastCursorX = pt.x;
+        pCat->lastCursorY = pt.y;
         return 0;
     }
 
@@ -557,6 +577,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             ReleaseCapture();
             pCat->SetAction(IDLE); 
             pCat->timeToThink = 30;
+
+            pCat->speedX = pCat->throwSpeedX;
+            pCat->speedY = pCat->throwSpeedY;
+
+            // 너무 빠르면 제한 (선택사항)
+            // if (pCat->speedX > 20) pCat->speedX = 20;
+            // if (pCat->speedX < -20) pCat->speedX = -20;
         }
         return 0;
     }
@@ -668,8 +695,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     winH = (int)(FRAME_HEIGHT * SCALE);
     POINT pt;
     GetCursorPos(&pt);
-    lastCursorX = pt.x;
-    lastCursorY = pt.y;
 
     RECT workArea;
     SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);

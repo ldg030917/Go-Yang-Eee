@@ -6,6 +6,7 @@
 #include <vector>
 #include <wininet.h>
 #include <stdio.h>
+#include <cmath> // sin, cos 사용 위해 필요
 #pragma comment(lib, "wininet.lib")
 
 //taskkill /IM Go-Yang-Eee.exe /F
@@ -15,7 +16,7 @@ using namespace Gdiplus;
 // 내 버전
 #define VER_MAJOR 1
 #define VER_MINOR 2
-#define VER_PATCH 11
+#define VER_PATCH 13
 // 버전 파일이 있는 URL (Raw 텍스트여야 함)
 #define VERSION_URL L"https://gist.githubusercontent.com/ldg030917/f1ba0b5ebcb8c276ddff2b7c6ecbab54/raw/version.txt"
 // 다운로드 페이지 URL
@@ -36,7 +37,9 @@ const int ANIM_SPEED = 96;   // 애니메이션 속도 (ms)
 const int PHYSICS_SPEED = 16; // ★ 추가: 물리 갱신 속도 (약 60 FPS)
 const float SCALE = 3.0f;   // 세 배로 키우기
 const int MOVE_SPEED = 5;
-
+// ★ [수정 1] 목덜미 잡기 좌표 상수 추가
+const int NECK_OFFSET_X = (int)((FRAME_WIDTH * SCALE) / 2); // 가로 중심
+const int NECK_OFFSET_Y = (int)(16 * SCALE);                // 위에서 10픽셀(스케일 적용) 내려온 곳
 
 float gravity = 0.8f; // 중력 가속도
 
@@ -175,6 +178,14 @@ struct Cat {
     float angle = 0.0f; // 현재 회전 각도
     float swingSpeed = 0.0f; // 흔들림 속도
     int lastCursorX, lastCursorY;
+    int physicsLastX = 0; // ★ [추가] 물리 엔진 전용 좌표 기억 변수 (Update만 건드림)
+    
+    // 물리 엔진 변수 (v1.2.13)
+    float angularVelocity = 0.0f; // 각속도 (swingSpeed 대체)
+    float angularAccel = 0.0f;    // 각가속도
+    float neckLen = 0.0f;      // 현재 목이 늘어난 길이 (0이면 원래 위치)
+    float neckVel = 0.0f;      // 목이 늘어나는/줄어드는 속도
+    float prevVelX = 0.0f; // 이전 프레임의 마우스 속도를 기억해 가속도(힘)를 구함
 
     // 2. 개별 속성 (고양이마다 다르게 줄 수 있음)
     int animTimer; // 애니메이션 타이머 (개별 동작 위해)
@@ -281,7 +292,22 @@ struct Cat {
         // hwnd 대신 this->hwnd, pCat-> 대신 this-> 사용
         if (isDragging) {
             // 행잉
-            //float force =
+            POINT pt; GetCursorPos(&pt);
+            float mouseVelX = (float)(pt.x - physicsLastX);
+            physicsLastX = pt.x; // 다음 프레임을 위해 갱신
+
+            float force = mouseVelX * 0.03f;
+            
+            swingSpeed += force;
+            swingSpeed -= angle * 0.05f;
+            swingSpeed *= 0.95f;
+
+            // 6. 각도 적용
+            angle += swingSpeed;
+
+            // 7. 각도 제한 (목 꺾임 방지)
+            if (angle > 60.0f) { angle = 60.0f; swingSpeed = 0; }
+            if (angle < -60.0f) { angle = -60.0f; swingSpeed = 0; }
         }
         // [영역 1] 물리 엔진 & 이동 (매번 실행)
         else {
@@ -290,6 +316,11 @@ struct Cat {
             int floorY = workArea.bottom;
             float friction = (posY + winH >= floorY) ? 0.5f : 0.05f;
 
+            // 드래그 아닐 때, 각도 0으로 복귀
+            if (angle != 0) {
+                angle *= 0.8f; // 빠르게 0으로
+                if (abs(angle) < 1.0f) angle = 0.0f;
+            }
             // // 마찰력 적용 (감속)
             // if (speedX > 0) {
             //     speedX -= friction;
@@ -485,8 +516,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 srcX += FRAME_WIDTH;
                 srcW = -FRAME_WIDTH; // 뒤집기
             }
+            GraphicsState state = graphics.Save();
+            // 2. 회전 중심점 설정 (고양이 머리 위쪽 중앙)
+            // 화면상의 그리기 좌표 기준 (보통 0, 0에서 그림)
+            float pivotX = NECK_OFFSET_X;
+            float pivotY = NECK_OFFSET_Y; // 머리 꼭대기 약간 아래
+            
+            // 3. 변환 행렬 적용
+            graphics.TranslateTransform(pivotX, pivotY); // 중심으로 이동
+            graphics.RotateTransform(pCat->angle);       // 회전!
+            graphics.TranslateTransform(-pivotX, -pivotY); // 원상복구
 
             graphics.DrawImage(pCat->myImage, destRect, srcX, srcY, srcW, FRAME_HEIGHT, UnitPixel);
+            // 5. 상태 복구 (다음 그리기 위해)
+            graphics.Restore(state);
         }
 
         BitBlt(hdc, 0, 0, w, h, memDC, 0, 0, SRCCOPY);
@@ -510,11 +553,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT rect; GetWindowRect(hwnd, &rect);
         
         // 구조체 멤버 dragOffset 사용
-        pCat->dragOffset.x = pt.x - rect.left;
-        pCat->dragOffset.y = pt.y - rect.top;
+        pCat->dragOffset.x = NECK_OFFSET_X;
+        pCat->dragOffset.y = NECK_OFFSET_Y;
+
+        // 변경: 고양이 위치를 마우스 위치 기준으로 재설정
+        pCat->posX = pt.x - NECK_OFFSET_X;
+        pCat->posY = pt.y - NECK_OFFSET_Y;
+        
+        SetWindowPos(hwnd, NULL, pCat->posX, pCat->posY, 0, 0, 
+                 SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
         pCat->lastCursorX = pt.x;
         pCat->lastCursorY = pt.y;
-        
+        pCat->physicsLastX = pt.x; // ★ [추가] 물리용 초기화 (이거 안하면 잡는 순간 미친듯이 돔)
+
         SetCapture(hwnd);
         return 0;
     }

@@ -16,7 +16,7 @@ using namespace Gdiplus;
 // 내 버전
 #define VER_MAJOR 1
 #define VER_MINOR 2
-#define VER_PATCH 13
+#define VER_PATCH 14
 // 버전 파일이 있는 URL (Raw 텍스트여야 함)
 #define VERSION_URL L"https://gist.githubusercontent.com/ldg030917/f1ba0b5ebcb8c276ddff2b7c6ecbab54/raw/version.txt"
 // 다운로드 페이지 URL
@@ -78,7 +78,7 @@ enum ActionType {
 
 const int ACTION_FRAMES[MAX_ACTIONS] = {4, 4, 4, 4, 8, 8, 4, 6, 7, 8, 4, 8, 4, 5};
 // 전역 변수
-const wchar_t CLASS_NAME[] = L"MyDesktopPetClass";
+const wchar_t CLASS_NAME[] = L"Go-Yang-Eee";
 
 // 리소스에서 이미지를 불러오는 함수
 Image* LoadImageFromResource(HINSTANCE hInstance, int resId, IStream** outStream) {
@@ -180,13 +180,6 @@ struct Cat {
     int lastCursorX, lastCursorY;
     int physicsLastX = 0; // ★ [추가] 물리 엔진 전용 좌표 기억 변수 (Update만 건드림)
     
-    // 물리 엔진 변수 (v1.2.13)
-    float angularVelocity = 0.0f; // 각속도 (swingSpeed 대체)
-    float angularAccel = 0.0f;    // 각가속도
-    float neckLen = 0.0f;      // 현재 목이 늘어난 길이 (0이면 원래 위치)
-    float neckVel = 0.0f;      // 목이 늘어나는/줄어드는 속도
-    float prevVelX = 0.0f; // 이전 프레임의 마우스 속도를 기억해 가속도(힘)를 구함
-
     // 2. 개별 속성 (고양이마다 다르게 줄 수 있음)
     int animTimer; // 애니메이션 타이머 (개별 동작 위해)
     int catType;   // 102(치즈), 103(검정) 등 리소스 ID
@@ -205,6 +198,10 @@ struct Cat {
     bool isDragging; // 드래그 확인용
     POINT dragOffset;
     float throwSpeedX = 0.0f, throwSpeedY = 0.0f;
+
+    // 상호작용 추가
+    Cat* partner = nullptr; // 현재 상호작용 중인 상대 고양이
+    bool isGrooming = false; // 내가 그루밍해주는 쪽인가
 
     Cat(int startX, int startY, int type, HINSTANCE hInstance) {
         posX = startX;
@@ -246,51 +243,21 @@ struct Cat {
         }
     }
 
-    void Think() {
-        if (isDragging) return;
-        // 랜덤으로 다음 행동 결정 (0: IDLE, 1: WALK_LEFT, 2: WALK_RIGHT)
-
-        int idleW = lazy * 2;
-        int moveW = energy * 2;
-        int sleepW = (100 - energy);
-        int cleanW = friendliness;
-
-        int totalW = idleW + moveW + sleepW + cleanW;
-        int choice = rand() % totalW;
-
-        if (choice < idleW) {
-            // 가만히 있기
-            SetAction((rand()%2 == 0) ? IDLE : IDLE2);
-            targetSpeedX = 0;
-            timeToThink = 30 + lazy;
-        }
-        else if (choice < idleW + moveW) {
-            // 이동
-            SetAction((rand()%2 == 0) ? MOVE : MOVE2);
-            targetSpeedX = (rand() % 2 == 0) ? -MOVE_SPEED : MOVE_SPEED;
-            if (energy > 80) targetSpeedX *= 1.5; // 광란의 질주
-            isLookingRight = (targetSpeedX > 0);
-            timeToThink = 10 + rand() % (100 - energy); // 에너지가 많으면 금방 다음 행동 함
-        }
-        else if (choice < idleW + moveW + sleepW) {
-            // 잠자기
-            SetAction(SLEEP);
-            targetSpeedX = 0;
-            timeToThink = 100 + (lazy * 2);
-        }
-        else {
-            // [그루밍/기타]
-            SetAction((rand() % 2 == 0) ? CLEAN : CLEAN2);
-            targetSpeedX = 0;
-            timeToThink = 20 + rand() % 40;
-        }
-    }
+    void Think();
 
     void Update() {
-        // [물리 엔진 로직 이동]
-        // WindowProc에 있던 pCat->posX += ... 코드들을 여기에 복사
-        // hwnd 대신 this->hwnd, pCat-> 대신 this-> 사용
+        // 상대방이 없는데(null) 파트너라고 생각 중이면 초기화 (안전장치)
+        if (partner != nullptr && partner->partner != this) partner = nullptr;
         if (isDragging) {
+            if (partner != nullptr) {
+                partner->partner = nullptr;
+                partner->SetAction(IDLE);
+                partner->timeToThink = 0;   // 즉시 새 행동 찾게 함
+
+                partner = nullptr; // 나도 솔로 복귀
+                isGrooming = false;
+            }
+
             // 행잉
             POINT pt; GetCursorPos(&pt);
             float mouseVelX = (float)(pt.x - physicsLastX);
@@ -308,6 +275,16 @@ struct Cat {
             // 7. 각도 제한 (목 꺾임 방지)
             if (angle > 60.0f) { angle = 60.0f; swingSpeed = 0; }
             if (angle < -60.0f) { angle = -60.0f; swingSpeed = 0; }
+
+            // 위치 반영 (마우스 따라가기)
+            posX = pt.x - NECK_OFFSET_X;
+            posY = pt.y - NECK_OFFSET_Y;
+
+            SetWindowPos(hwnd, NULL, posX, posY, 0, 0, 
+                     SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+
+            throwSpeedX = mouseVelX;
+            speedX = 0; speedY = 0;
         }
         // [영역 1] 물리 엔진 & 이동 (매번 실행)
         else {
@@ -400,6 +377,121 @@ struct Cat {
 };
 
 std::vector<Cat*> cats;
+
+// 두 고양이 사이의 거리(픽셀) 반환
+float GetDistance(Cat* a, Cat* b) {
+    float dx = (float)(a->posX - b->posX);
+    float dy = (float)(a->posY - b->posY);
+    return sqrt(dx*dx + dy*dy);
+}
+
+void Cat::Think() {
+    if (isDragging) return;
+    if (partner != nullptr) {
+        if (partner->partner == this) {
+            partner->partner = nullptr;
+            partner->timeToThink = 0; // 상대도 즉시 다른 행동 하도록
+        }
+        
+        // 나도 해방
+        partner = nullptr;
+        isGrooming = false;
+        
+        // 그리고 나서 아래의 일반적인 랜덤 행동 로직으로 넘어감 (자연스럽게 헤어짐)
+    }
+    // 랜덤으로 다음 행동 결정 (0: IDLE, 1: WALK_LEFT, 2: WALK_RIGHT)
+
+    int idleW = lazy * 2;
+    int moveW = energy * 2;
+    int sleepW = (100 - energy);
+    int cleanW = friendliness;
+
+    int totalW = idleW + moveW + sleepW + cleanW;
+    int choice = rand() % totalW;
+
+    if (choice < idleW) {
+        // 가만히 있기
+        SetAction((rand()%2 == 0) ? IDLE : IDLE2);
+        targetSpeedX = 0;
+        timeToThink = 30 + lazy;
+    }
+    else if (choice < idleW + moveW) {
+        // 이동
+        SetAction((rand()%2 == 0) ? MOVE : MOVE2);
+        targetSpeedX = (rand() % 2 == 0) ? -MOVE_SPEED : MOVE_SPEED;
+        if (energy > 80) targetSpeedX *= 1.5; // 광란의 질주
+        isLookingRight = (targetSpeedX > 0);
+        timeToThink = 10 + rand() % (100 - energy); // 에너지가 많으면 금방 다음 행동 함
+    }
+    else if (choice < idleW + moveW + sleepW) {
+        // 잠자기
+        SetAction(SLEEP);
+        targetSpeedX = 0;
+        timeToThink = 100 + (lazy * 2);
+    }
+    else {
+        // [그루밍/기타]
+        SetAction((rand() % 2 == 0) ? CLEAN : CLEAN2);
+        targetSpeedX = 0;
+        timeToThink = 20 + rand() % 40;
+    }
+    if (friendliness > 40 && rand() % 100 < 10) {
+            // 전역 벡터 'cats'에 접근해야 함 (extern 선언 필요하거나 매개변수로 받아야 함)
+        // 여기서는 편의상 전역변수 cats가 있다고 가정
+        for (Cat* other : cats) {
+            if (other == this) continue; // 나 자신은 제외
+            if (other->partner != nullptr) continue; // 쟤가 이미 딴 애랑 놀고 있으면 패스
+            if (other->isDragging) continue; // 잡려가고 있으면 패스
+
+            // 거리 체크 (150픽셀 이내)
+            if (GetDistance(this, other) < 150.0f) {
+                
+                // ★ 상호작용 시작! (커플 성사)
+                this->partner = other;
+                other->partner = this;
+
+                // 1. 역할 분담
+                this->isGrooming = true;  // 내가 해주는 쪽
+                other->isGrooming = false; // 쟤는 받는 쪽
+
+                int timeToGrooming = 120 + rand() % 100;
+                // 2. 행동 설정 (Giver)
+                this->SetAction(CLEAN); // 핥는 모션 (CLEAN 재활용)
+                this->targetSpeedX = 0;
+                this->timeToThink = timeToGrooming; // 꽤 오래 함 (약 2.5초)
+
+                // 3. 행동 설정 (Receiver)
+                other->SetAction(LIE); // 눕거나 앉아있기
+                other->targetSpeedX = 0;
+                other->timeToThink = timeToGrooming; // 나랑 똑같이 끝내야 함
+
+                // 4. 위치 보정 (중요: 서로 바라보게 만들기)
+                // 내가 쟤보다 왼쪽에 있으면?
+                if (this->posX < other->posX) {
+                    this->isLookingRight = true;  // 나는 오른쪽 봄
+                    other->isLookingRight = false; // 쟤는 왼쪽 봄 (마주보기)
+                    
+                    // 딱 붙여주기 (겹치지 않게 약간 거리 둠)
+                    this->posX = other->posX - 32; 
+                } 
+                else { // 내가 오른쪽에 있으면
+                    this->isLookingRight = false;
+                    other->isLookingRight = true;
+                    this->posX = other->posX + 32;
+                }
+                
+                // Y축 맞추기 (바닥 높이 통일)
+                this->posY = other->posY; 
+
+                // 즉시 윈도우 이동 반영 (안 하면 텔레포트처럼 보임)
+                SetWindowPos(this->hwnd, NULL, this->posX, this->posY, 0, 0, SWP_NOSIZE|SWP_NOZORDER);
+                SetWindowPos(other->hwnd, NULL, other->posX, other->posY, 0, 0, SWP_NOSIZE|SWP_NOZORDER);
+
+                return; // 상호작용 성공했으니 Think 종료
+            }
+        }
+    }
+}
 
 void InitTrayIcon(HWND hwnd) {
     NOTIFYICONDATAW nid = { 0 };
@@ -579,28 +671,28 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         // 여기서는 간단히 처리:
         
         if (pCat->isDragging) {            
-            int newX = pt.x - pCat->dragOffset.x;
-            int newY = pt.y - pCat->dragOffset.y;
+            // int newX = pt.x - pCat->dragOffset.x;
+            // int newY = pt.y - pCat->dragOffset.y;
             
-            pCat->posX = newX;
-            pCat->posY = newY;
-            pCat->speedY = 0.0f;
+            // pCat->posX = newX;
+            // pCat->posY = newY;
+            // pCat->speedY = 0.0f;
 
-            // 던지기 속도 계산
-            pCat->throwSpeedX = (float)(pt.x - pCat->lastCursorX);
-            pCat->throwSpeedY = (float)(pt.y - pCat->lastCursorY);
-            // 좌표가 화면 밖으로 튀면 소리 재생 + 복구
-            if (newX < -200 || newX > 5000) {
-                MessageBeep(MB_ICONHAND); // 경고음!
-                pCat->posX = 100; // 강제 복구
-                pCat->isDragging = false; // 드래그 강제 해제
-            }
+            // // 던지기 속도 계산
+            // pCat->throwSpeedX = (float)(pt.x - pCat->lastCursorX);
+            // pCat->throwSpeedY = (float)(pt.y - pCat->lastCursorY);
+            // // 좌표가 화면 밖으로 튀면 소리 재생 + 복구
+            // if (newX < -200 || newX > 5000) {
+            //     MessageBeep(MB_ICONHAND); // 경고음!
+            //     pCat->posX = 100; // 강제 복구
+            //     pCat->isDragging = false; // 드래그 강제 해제
+            // }
 
-            SetWindowPos(hwnd, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            // SetWindowPos(hwnd, NULL, newX, newY, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
         }
         else {
             // 쓰다듬기 로직 (간소화)
-            int dx = abs(pt.x - pCat->lastCursorX); // 전역 변수 사용 (주의)
+            int dx = abs(pt.x - pCat->lastCursorX);
             int dy = abs(pt.y - pCat->lastCursorY);
             
             if (dx + dy > 0 && dx + dy < 100) {

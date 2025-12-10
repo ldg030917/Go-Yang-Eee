@@ -638,7 +638,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 
     case WM_LBUTTONDOWN: {
         pCat->isDragging = true;
-        pCat->speedX = 0;
+        pCat->targetSpeedX = 0;
         pCat->SetAction(GRABBED);
         
         POINT pt; GetCursorPos(&pt);

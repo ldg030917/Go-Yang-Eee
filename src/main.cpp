@@ -5,6 +5,7 @@
 #include <shellapi.h> // Shell_NotifyIcon 용 (트레이 아이콘)
 #include <wininet.h> // 업데이트 체크용 인터넷 라이브러리
 #include "config.h"
+#include "cat_states.h"
 
 #pragma comment(lib, "wininet.lib")
 
@@ -186,23 +187,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         pCat->isDragging = true;
         pCat->targetSpeedX = 0;
         pCat->SetAction(GRABBED);
-        
-        POINT pt; GetCursorPos(&pt);
-        RECT rect; GetWindowRect(hwnd, &rect);
-        
-        // 구조체 멤버 dragOffset 사용
-        pCat->dragOffset.x = NECK_OFFSET_X;
-        pCat->dragOffset.y = NECK_OFFSET_Y;
 
-        // 변경: 고양이 위치를 마우스 위치 기준으로 재설정
-        pCat->posX = pt.x - NECK_OFFSET_X;
-        pCat->posY = pt.y - NECK_OFFSET_Y;
+        pCat->ChangeState(new GrabbedState());
+    
         
         SetWindowPos(hwnd, NULL, pCat->posX, pCat->posY, 0, 0, 
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-        pCat->lastCursorX = pt.x;
-        pCat->lastCursorY = pt.y;
-        pCat->physicsLastX = pt.x; // ★ [추가] 물리용 초기화 (이거 안하면 잡는 순간 미친듯이 돔)
 
         SetCapture(hwnd);
         return 0;
@@ -264,8 +254,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         if (pCat->isDragging) {
             pCat->isDragging = false;
             ReleaseCapture();
-            pCat->SetAction(IDLE); 
-            pCat->timeToThink = 30;
+            pCat->ChangeState(new IdleState());
 
             pCat->speedX = pCat->throwSpeedX;
             pCat->speedY = pCat->throwSpeedY;

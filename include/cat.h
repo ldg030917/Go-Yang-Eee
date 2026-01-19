@@ -2,11 +2,19 @@
 #pragma once
 #include "config.h"
 
+class CatState;
+
 class Cat {
+private:
+    CatState* currentState;   // 현재 상태
+    int health;     // 현재 체력
+    int maxHealth = 100;
 public:
+    int GetHealth() const { return health; }
+    void SetHealth(int val) { health = val; if(health > maxHealth) health = maxHealth; if(health < 0) health = 0; }
     float speedX = 0.0f; // 0: 정지, -5: 왼쪽, 5: 오른쪽
     float speedY = 0.0f; // 수직 속도
-    float targetSpeedX = 0.0f;
+    float targetSpeedX = 0.0f; // 목표로 하는 속도
     int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
     bool isJumping = false; // 점프/낙하 상태 확인용
     bool isLookingRight = true;
@@ -46,11 +54,13 @@ public:
 
     Cat(int startX, int startY, int type, HINSTANCE hInstance);
     ~Cat();
-
+    // FSM 제어
+    void ChangeState(CatState* newState);
     void SetAction(int newAction);
     void Think();
     void Update();
     void Render(HDC hdc, int w, int h); // WM_PAINT 로직을 담당
+    void ApplyPhysics(); // 물리 로직 함수
 };
 
 extern std::vector<Cat*> cats;

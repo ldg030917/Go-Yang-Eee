@@ -1,8 +1,9 @@
 // cat_states.cpp
 #include "cat_states.h"
 #include "cat.h"
-
 #include <iostream>
+
+using namespace std;
 
 void IdleState::Enter(Cat* cat) {
     // 상태 진입 시 초기 행동 설정
@@ -21,6 +22,7 @@ void IdleState::Update(Cat* cat) {
     // 중력 및 바닥/벽 충돌 로직은 Cat::Update에 남겨두거나 
     // 모든 상태에서 공통으로 쓰인다면 별도 함수로 뺍니다.
     std::cout << cat->timeToThink << std::endl;
+    cout << "health: " << cat->GetHealth() << endl;
     cat->ApplyPhysics(); // 중력 처리
     // 3. 행동 결정 (기존 Think 로직)
     if (cat->timeToThink <= 0) {
@@ -56,8 +58,10 @@ void IdleState::Update(Cat* cat) {
         cat->timeToThink = 20;
     }
 
+    cat->timeToThink -= 1;
+
     // 4. 체력 조금씩 소모 (활동에 따라)
-    //cat->SetHealth(cat->GetHealth() - 1); 
+    cat->SetHealth(cat->GetHealth() - 1); 
 }
 
 void GrabbedState::Enter(Cat* cat) {
@@ -90,4 +94,18 @@ void GrabbedState::Update(Cat* cat) {
     cat->physicsLastX = pt.x; // ★ [추가] 물리용 초기화 (이거 안하면 잡는 순간 미친듯이 돔)
     SetWindowPos(cat->hwnd, NULL, cat->posX, cat->posY, 0, 0, 
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+void SleepState::Update(Cat* cat) {
+    //cat->targetSpeedX = 0;
+    // 잠을 자서 체력을 전부 채우면, 기상
+    if (cat->GetHealth() == cat->maxHealth) {
+        cat->ChangeState(new IdleState());
+        return;
+    }
+
+    cout << "health: " << cat->GetHealth() << endl;
+
+    // 체력 회복
+    cat->SetHealth(cat->GetHealth() + 1);
 }

@@ -206,11 +206,6 @@ void Cat::Update() {
 
         // 프레임 넘기기 (개별)
         currentFrame = (currentFrame + 1) % maxFrame;
-
-        // AI 생각
-        if (!isDragging) {
-            if (timeToThink > 0) timeToThink--;
-        }
         
         // 쓰다듬기 게이지 감소
         if (rubCount > 0) {

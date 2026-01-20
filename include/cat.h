@@ -7,12 +7,13 @@ class CatState;
 class Cat {
 private:
     CatState* currentState;   // 현재 상태
-    int health;     // 현재 체력
-    int maxHealth = 100;
+
 public:
     int GetHealth() const { return health; }
     void SetHealth(int val) { health = val; if(health > maxHealth) health = maxHealth; if(health < 0) health = 0; }
-    float speedX = 0.0f; // 0: 정지, -5: 왼쪽, 5: 오른쪽
+    int health;     // 현재 체력
+    int maxHealth = 1000;
+    float speedX = 0.0f; // 수평 속도
     float speedY = 0.0f; // 수직 속도
     float targetSpeedX = 0.0f; // 목표로 하는 속도
     int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)

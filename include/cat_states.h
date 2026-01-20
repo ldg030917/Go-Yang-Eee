@@ -6,7 +6,7 @@
 // --- 기본 상태 (가만히 있기, 걷기) ---
 class IdleState : public CatState {
 private:
-    int stateTimer; // 행동 유지 시간
+    int stateTimer; // 행동 유지 시간, 지금은 timeToThink로 같이 묶어 사용 중
 
 public:
     void Enter(Cat* cat) override;
@@ -23,8 +23,11 @@ class GrabbedState : public CatState {
 
 // --- 수면 상태 (체력 소모 시) ---
 class SleepState : public CatState {
-    void Enter(Cat* cat) override {}
-    void Update(Cat* cat) override {}
+    void Enter(Cat* cat) override {
+        cat->SetAction(SLEEP);
+        cat->targetSpeedX = 0;
+    }
+    void Update(Cat* cat) override;
     void Exit(Cat* cat) override {}
 };
 

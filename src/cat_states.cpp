@@ -12,18 +12,12 @@ void IdleState::Enter(Cat* cat) {
 }
 
 void IdleState::Update(Cat* cat) {
-    // 1. 상태 전환 조건 체크 (체력)
-    if (cat->GetHealth() <= 0) {
-        cat->ChangeState(new SleepState());
-        return;
-    }
-
-    // 2. 물리 및 이동 로직 (기존 Update의 else 부분)
-    // 중력 및 바닥/벽 충돌 로직은 Cat::Update에 남겨두거나 
-    // 모든 상태에서 공통으로 쓰인다면 별도 함수로 뺍니다.
-    std::cout << cat->timeToThink << std::endl;
-    cout << "health: " << cat->GetHealth() << endl;
+    cat->TryEnterSleepState(); // 잠잘지 확인
     cat->ApplyPhysics(); // 중력 처리
+
+    // std::cout << cat->timeToThink << std::endl;
+    // cout << "health: " << cat->GetHealth() << endl;
+
     // 3. 행동 결정 (기존 Think 로직)
     if (cat->timeToThink <= 0) {
         // int idleW = cat->lazy * 2;
@@ -62,6 +56,12 @@ void IdleState::Update(Cat* cat) {
 
     // 4. 체력 조금씩 소모 (활동에 따라)
     cat->SetHealth(cat->GetHealth() - 1); 
+
+    // State 강제 변환용 코드
+    if (GetAsyncKeyState(VK_CONTROL) & 0x8000) { // 컨트롤 키 누르면 사냥 시작
+    cat->ChangeState(new HuntState());
+    return;
+}
 }
 
 void GrabbedState::Enter(Cat* cat) {
@@ -108,4 +108,73 @@ void SleepState::Update(Cat* cat) {
 
     // 체력 회복
     cat->SetHealth(cat->GetHealth() + 1);
+}
+
+void HuntState::Update(Cat* cat) {
+    POINT pt;
+    GetCursorPos(&pt); // 마우스 위치 가져오기
+
+    float dx = (float)(pt.x - (cat->posX + NECK_OFFSET_X));
+    float dy = (float)(pt.y - (cat->posY + NECK_OFFSET_Y));
+    float distance = sqrt(dx * dx + dy * dy);
+
+    cat->ApplyPhysics();
+    
+    // 1. 이미 점프 중일 때 로직
+    if (isJump) {
+
+        // 공중에서 마우스와 충분히 가까워지면 낚아채기
+        if (distance < 50.0f && catchTimer <= 0) {
+            cat->SetAction(PAW); // 앞발 휘두르기
+            catchTimer = 20;     // 낚아채기 동작 유지
+            cout << "dd!" << endl;
+        }
+
+        // 바닥에 착지하면 점프 상태 해제
+        if (!cat->isJumping) {
+            cout << "DEAD" << endl;
+            isJump = false;
+            cat->targetSpeedX = 0;
+            cat->ChangeState(new IdleState());
+            return;
+        }
+        
+        if (catchTimer > 0) catchTimer--;
+        return;
+    }
+
+    // 2. 바닥에서 마우스를 향해 준비/이동
+    cat->isLookingRight = (dx > 0);
+
+    // 거리가 너무 멀면 일단 걷기
+    if (distance > 300.0f) {
+        cat->SetAction(MOVE);
+        cat->targetSpeedX = (dx > 0) ? MOVE_SPEED : -MOVE_SPEED;
+    } 
+    // 적정 거리(100~300px)면 점프 공격!
+    else if (distance > 50.0f) {
+        cat->SetAction(JUMP);
+        cat->isJumping = true;
+
+        // 마우스 거리에 비례한 동적 점프 힘 계산
+        float jumpPowerY = 10.0f + (abs(dy) * 0.05f); 
+        float jumpPowerX = (dx / 15.0f); // 거리에 따른 수평 속도
+
+        cat->speedY = -jumpPowerY;
+        cat->targetSpeedX = jumpPowerX;
+        isJump = true;
+        
+        //printf("점프! (Power Y: %.1f, X: %.1f)\n", jumpPowerY, jumpPowerX);
+    }
+    // 너무 가까우면 그냥 솜방망이질
+    else {
+        cat->SetAction(PAW);
+        cat->targetSpeedX = 0;
+    }
+
+    // 마우스가 너무 멀어지면 사냥 포기 (테스트용)
+    if (distance > 800.0f) {
+        cat->ChangeState(new IdleState());
+        return;
+    }
 }

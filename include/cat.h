@@ -62,6 +62,14 @@ public:
     void Update();
     void Render(HDC hdc, int w, int h); // WM_PAINT 로직을 담당
     void ApplyPhysics(); // 물리 로직 함수
+    // SleepState로 전이할 지 확인하고 조건에 맞으면 전이하는 함수
+    void TryEnterSleepState() {
+        if (GetHealth() <= 0 && isJumping) {
+            ChangeState(new SleepState());
+            return;
+        }
+    }
+    //void Try();
 };
 
 extern std::vector<Cat*> cats;

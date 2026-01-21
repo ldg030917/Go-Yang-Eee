@@ -31,3 +31,18 @@ class SleepState : public CatState {
     void Exit(Cat* cat) override {}
 };
 
+// --- 사냥 상태 (장난감, 음식을 향해 점프) ---
+class HuntState : public CatState {
+private:
+    bool isJump;
+    int catchTimer;
+public:
+    void Enter(Cat* cat) override {
+        cat->SetAction(JUMP);
+        isJump = false;
+        catchTimer = 0;
+        cat->targetSpeedX = 0;
+    }
+    void Update(Cat* cat) override;
+    void Exit(Cat* cat) override {}
+};

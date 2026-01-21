@@ -407,7 +407,7 @@ void Cat::ApplyPhysics() {
         speedX *= 0.8f; 
         if (abs(speedX) < 0.1f) speedX = 0.0f;
 
-        if (currentAction == JUMP && isJumping) {
+        if (isJumping) {
             isJumping = false;
             SetAction(IDLE);
         }

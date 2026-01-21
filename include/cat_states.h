@@ -34,12 +34,11 @@ class SleepState : public CatState {
 // --- 사냥 상태 (장난감, 음식을 향해 점프) ---
 class HuntState : public CatState {
 private:
-    bool isJump;
+    bool hasJumped; // 지금 상태에서 점프했는지 확인용
     int catchTimer;
 public:
     void Enter(Cat* cat) override {
         cat->SetAction(JUMP);
-        isJump = false;
         catchTimer = 0;
         cat->targetSpeedX = 0;
     }

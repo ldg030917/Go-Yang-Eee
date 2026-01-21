@@ -17,7 +17,7 @@ public:
     float speedY = 0.0f; // 수직 속도
     float targetSpeedX = 0.0f; // 목표로 하는 속도
     int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
-    bool isJumping = false; // 점프/낙하 상태 확인용
+    bool isGrounded = false; // 땅에 붙어있는 상태인지
     bool isLookingRight = true;
     int currentAction = IDLE;
     int currentFrame = 0;
@@ -63,12 +63,7 @@ public:
     void Render(HDC hdc, int w, int h); // WM_PAINT 로직을 담당
     void ApplyPhysics(); // 물리 로직 함수
     // SleepState로 전이할 지 확인하고 조건에 맞으면 전이하는 함수
-    void TryEnterSleepState() {
-        if (GetHealth() <= 0 && isJumping) {
-            ChangeState(new SleepState());
-            return;
-        }
-    }
+    void TryEnterSleepState();
     //void Try();
 };
 

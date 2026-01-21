@@ -67,6 +67,7 @@ void IdleState::Update(Cat* cat) {
 void GrabbedState::Enter(Cat* cat) {
     cat->SetAction(GRABBED);
     cat->targetSpeedX = 0;
+    cat->isGrounded = false;
 }
 
 void GrabbedState::Update(Cat* cat) {
@@ -119,9 +120,9 @@ void HuntState::Update(Cat* cat) {
     float distance = sqrt(dx * dx + dy * dy);
 
     cat->ApplyPhysics();
-    
+
     // 1. 이미 점프 중일 때 로직
-    if (isJump) {
+    if (!cat->isGrounded) {
 
         // 공중에서 마우스와 충분히 가까워지면 낚아채기
         if (distance < 50.0f && catchTimer <= 0) {
@@ -129,17 +130,16 @@ void HuntState::Update(Cat* cat) {
             catchTimer = 20;     // 낚아채기 동작 유지
             cout << "dd!" << endl;
         }
-
-        // 바닥에 착지하면 점프 상태 해제
-        if (!cat->isJumping) {
-            cout << "DEAD" << endl;
-            isJump = false;
-            cat->targetSpeedX = 0;
-            cat->ChangeState(new IdleState());
-            return;
-        }
         
         if (catchTimer > 0) catchTimer--;
+        return;
+    }
+
+    // 바닥에 착지하면 점프 상태 해제
+    if (cat->isGrounded && hasJumped) {
+        hasJumped = false;
+        cat->targetSpeedX = 0;
+        cat->ChangeState(new IdleState());
         return;
     }
 
@@ -154,7 +154,6 @@ void HuntState::Update(Cat* cat) {
     // 적정 거리(100~300px)면 점프 공격!
     else if (distance > 50.0f) {
         cat->SetAction(JUMP);
-        cat->isJumping = true;
 
         // 마우스 거리에 비례한 동적 점프 힘 계산
         float jumpPowerY = 10.0f + (abs(dy) * 0.05f); 
@@ -162,9 +161,7 @@ void HuntState::Update(Cat* cat) {
 
         cat->speedY = -jumpPowerY;
         cat->targetSpeedX = jumpPowerX;
-        isJump = true;
-        
-        //printf("점프! (Power Y: %.1f, X: %.1f)\n", jumpPowerY, jumpPowerX);
+        hasJumped = true;
     }
     // 너무 가까우면 그냥 솜방망이질
     else {

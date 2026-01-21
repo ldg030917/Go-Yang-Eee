@@ -403,14 +403,14 @@ void Cat::ApplyPhysics() {
     if (posY + winH >= floorY) {
         posY = floorY - winH;
         speedY = 0.0f;
+        isGrounded = true;
+        if (currentAction == JUMP) SetAction(IDLE);
         // 바닥에 닿으면 좌우 속도 감속 (마찰력)
         speedX *= 0.8f; 
         if (abs(speedX) < 0.1f) speedX = 0.0f;
-
-        if (isJumping) {
-            isJumping = false;
-            SetAction(IDLE);
-        }
+    }
+    else {
+        isGrounded = false;
     }
 
     // 5. 좌우 이동 및 벽 충돌
@@ -430,3 +430,10 @@ void Cat::ApplyPhysics() {
     SetWindowPos(hwnd, NULL, posX, posY, 0, 0, 
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOREDRAW | SWP_NOACTIVATE);
 }
+
+void Cat::TryEnterSleepState() {
+    if (GetHealth() <= 0 && isGrounded) {  // 체력이 없고 땅에 닿아있으면
+        ChangeState(new SleepState());
+        return;
+    }
+};

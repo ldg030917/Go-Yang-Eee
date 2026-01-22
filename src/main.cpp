@@ -1,11 +1,12 @@
 // main.cpp
-#include "cat.h"
 #include <time.h> // srand 초기화용
 #include <shlwapi.h> // IStream 변환용
 #include <shellapi.h> // Shell_NotifyIcon 용 (트레이 아이콘)
 #include <wininet.h> // 업데이트 체크용 인터넷 라이브러리
 #include "config.h"
 #include "cat_states.h"
+#include "game_manager.h"
+
 
 #pragma comment(lib, "wininet.lib")
 
@@ -78,6 +79,22 @@ void CheckForUpdate(HWND hwnd) {
 }
 
 std::vector<Cat*> cats;
+FishingRod* fishingRod = nullptr; // 낚싯대 포인터
+bool fishingRodActive = false;    // 활성화 여부
+
+void ToggleFishingRod() {
+    auto& gm = GameManager::get();
+    if (gm.fishingRodActive) {
+        delete gm.fishingRod;
+        gm.fishingRod = nullptr;
+        gm.fishingRodActive = false;
+        printf("낚싯대 OFF\n");
+    } else {
+        gm.fishingRod = new FishingRod(12, 20.0f);
+        gm.fishingRodActive = true;
+        printf("낚싯대 ON (Ctrl+Alt+F)\n");
+    }
+}
 
 // 두 고양이 사이의 거리(픽셀) 반환
 float GetDistance(Cat* a, Cat* b) {
@@ -125,6 +142,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // 핫키 등록...
             RegisterHotKey(hwnd, ID_HOTKEY_ADD, MOD_CONTROL | MOD_ALT, 'C');
             RegisterHotKey(hwnd, ID_HOTKEY_REMOVE, MOD_CONTROL | MOD_ALT, 'D');
+            RegisterHotKey(hwnd, ID_FISHING_ROD_TOGGLE, MOD_CONTROL | MOD_ALT, 'F'); // Ctrl+Alt+F
         }
         return 0;
     }

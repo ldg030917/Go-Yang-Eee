@@ -2,6 +2,7 @@
 #include "cat_states.h"
 #include "cat.h"
 #include <iostream>
+#include "game_manager.h"
 
 using namespace std;
 
@@ -12,8 +13,14 @@ void IdleState::Enter(Cat* cat) {
 }
 
 void IdleState::Update(Cat* cat) {
+    auto& gm = GameManager::get();
     cat->TryEnterSleepState(); // 잠잘지 확인
     cat->ApplyPhysics(); // 중력 처리
+
+    if (gm.fishingRodActive && gm.fishingRod && gm.fishingRod->IsToyNear(cat)) {
+        cat->ChangeState(new HuntState());
+        return;
+    }
 
     // std::cout << cat->timeToThink << std::endl;
     // cout << "health: " << cat->GetHealth() << endl;

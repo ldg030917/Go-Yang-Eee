@@ -64,3 +64,6 @@ enum ActionType {
 };
 
 const int ACTION_FRAMES[MAX_ACTIONS] = {4, 4, 4, 4, 8, 8, 4, 6, 7, 8, 4, 8, 4, 5};
+
+// 임시
+#define ID_FISHING_ROD_TOGGLE 9003

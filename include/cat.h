@@ -64,7 +64,7 @@ public:
     void ApplyPhysics(); // 물리 로직 함수
     // SleepState로 전이할 지 확인하고 조건에 맞으면 전이하는 함수
     void TryEnterSleepState();
-    //void Try();
+    void TryEnterHuntState();
 };
 
 extern std::vector<Cat*> cats;

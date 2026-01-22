@@ -437,3 +437,7 @@ void Cat::TryEnterSleepState() {
         return;
     }
 };
+
+void Cat::TryEnterHuntState() {
+    
+}

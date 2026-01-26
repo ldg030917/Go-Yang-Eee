@@ -121,9 +121,12 @@ void SleepState::Update(Cat* cat) {
 void HuntState::Update(Cat* cat) {
     POINT pt;
     GetCursorPos(&pt); // 마우스 위치 가져오기
+    
+    auto& gm = GameManager::get();
+    POINT toy_pos = gm.fishingRod.GetToyPosition();
 
-    float dx = (float)(pt.x - (cat->posX + NECK_OFFSET_X));
-    float dy = (float)(pt.y - (cat->posY + NECK_OFFSET_Y));
+    float dx = (float)(toy_pos.x - (cat->posX + NECK_OFFSET_X));
+    float dy = (float)(toy_pos.y - (cat->posY + NECK_OFFSET_Y));
     float distance = sqrt(dx * dx + dy * dy);
 
     cat->ApplyPhysics();

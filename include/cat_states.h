@@ -45,3 +45,11 @@ public:
     void Update(Cat* cat) override;
     void Exit(Cat* cat) override {}
 };
+
+// --- 음식 먹는 상태 (무언갈 먹고, 해당 오브젝트의 텍스쳐 변형) ---
+class EatState : public CatState {
+public:
+    void Enter(Cat* cat) override;
+    void Update(Cat* cat) override;
+    void Exit(Cat* cat) override;
+}

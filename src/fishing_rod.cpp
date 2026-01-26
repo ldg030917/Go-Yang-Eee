@@ -14,7 +14,8 @@ FishingRod::FishingRod(int segments, float seg_length)
 
 void FishingRod::Update(float dt) {
     // 1. 마우스 위치로 첫 번째 점 고정
-    SetMouseTarget(0, 0); // UI에서 전달받은 마우스 좌표로 변경
+   point pt; GetCursorPos(&pt);
+    SetMouseTarget(pt.x, pt.y); // UI에서 전달받은 마우스 좌표로 변경
 
     // 2. 모든 점 물리 업데이트
     for (auto& p : points) p.Update(dt);

@@ -18,6 +18,7 @@ public:
     float targetSpeedX = 0.0f; // 목표로 하는 속도
     int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
     bool isGrounded = false; // 땅에 붙어있는 상태인지
+    bool isLookingRight;
     int currentAction = IDLE;
     int currentFrame = 0;
     int maxFrame = ACTION_FRAMES[IDLE];

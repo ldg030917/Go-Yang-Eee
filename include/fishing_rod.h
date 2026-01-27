@@ -42,5 +42,10 @@ public:
     void SetMouseTarget(float mx, float my); // UI에서 마우스 좌표 전달
     void Render(Graphics& g); // 낚싯대와 장난감 그리기
     bool IsToyNear(Cat* cat); // 고양이가 장난감 근처에 있는지 체크
-    Point GetToyPosition() { return Point((int)toy->x, (int)toy->y); }
+    POINT GetToyPosition() { 
+        POINT pt;
+        pt.x = toy->x;
+        pt.y = toy->y;
+        return pt;
+    }
 };

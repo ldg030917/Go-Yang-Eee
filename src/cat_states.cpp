@@ -65,10 +65,10 @@ void IdleState::Update(Cat* cat) {
     cat->SetHealth(cat->GetHealth() - 1); 
 
     // State 강제 변환용 코드
-    if (GetAsyncKeyState(VK_CONTROL) & 0x8000) { // 컨트롤 키 누르면 사냥 시작
-    cat->ChangeState(new HuntState());
-    return;
-}
+    // if (GetAsyncKeyState(VK_CONTROL) & 0x8000) { // 컨트롤 키 누르면 사냥 시작
+    //     cat->ChangeState(new HuntState());
+    //     return;
+    // }
 }
 
 void GrabbedState::Enter(Cat* cat) {
@@ -123,7 +123,7 @@ void HuntState::Update(Cat* cat) {
     GetCursorPos(&pt); // 마우스 위치 가져오기
     
     auto& gm = GameManager::get();
-    POINT toy_pos = gm.fishingRod.GetToyPosition();
+    POINT toy_pos = gm.fishingRod->GetToyPosition();
 
     float dx = (float)(toy_pos.x - (cat->posX + NECK_OFFSET_X));
     float dy = (float)(toy_pos.y - (cat->posY + NECK_OFFSET_Y));
@@ -195,7 +195,9 @@ Food* HuntState::findNearestFood(Cat* cat) {
     for (auto& food : gm.foods) {
         if (food.owner == nullptr) continue;
 
-        float dist = distance(cat->x, cat->y, food.x, food.y);
+        float dx = (float)(food.x - cat->posX);
+        float dy = (float)(food.y - cat->posY);
+        float dist = sqrt(dx * dx + dy * dy);
         if (dist < minDist && dist < 200) {
             minDist = dist;
             nearest = &food;

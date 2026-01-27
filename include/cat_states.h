@@ -2,6 +2,7 @@
 #pragma once
 #include "cat_state.h"
 #include "cat.h"
+#include "food.h"
 
 // --- 기본 상태 (가만히 있기, 걷기) ---
 class IdleState : public CatState {
@@ -37,6 +38,7 @@ private:
     bool hasJumped; // 지금 상태에서 점프했는지 확인용
     int catchTimer;
 public:
+    Food* findNearestFood(Cat* cat);
     void Enter(Cat* cat) override {
         cat->SetAction(JUMP);
         catchTimer = 0;
@@ -53,8 +55,8 @@ private:
 public:
     EatState(Food* food) : targetFood(food) {}
     void Enter(Cat* cat) override {
-        targetFood->owner = &cat;
+        targetFood->owner = cat;
     }
-    void Update(Cat* cat) override {}
-    void Exit(Cat* cat) override;
-}
+    void Update(Cat* cat) override;
+    void Exit(Cat* cat) override {}
+};

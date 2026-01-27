@@ -18,7 +18,6 @@ public:
     float targetSpeedX = 0.0f; // 목표로 하는 속도
     int timeToThink = 0; // 다음 행동 결정까지 남은 시간(프레임 수)
     bool isGrounded = false; // 땅에 붙어있는 상태인지
-    bool isLookingRight = true;
     int currentAction = IDLE;
     int currentFrame = 0;
     int maxFrame = ACTION_FRAMES[IDLE];
@@ -27,6 +26,8 @@ public:
     float swingSpeed = 0.0f; // 흔들림 속도
     int lastCursorX, lastCursorY;
     int physicsLastX = 0; // ★ [추가] 물리 엔진 전용 좌표 기억 변수 (Update만 건드림)
+    int hunger;     // 현재 배고픔
+    int maxHunger = 1000;
     
     // 2. 개별 속성 (고양이마다 다르게 줄 수 있음)
     int animTimer; // 애니메이션 타이머 (개별 동작 위해)

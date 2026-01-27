@@ -48,8 +48,13 @@ public:
 
 // --- 음식 먹는 상태 (무언갈 먹고, 해당 오브젝트의 텍스쳐 변형) ---
 class EatState : public CatState {
+private:
+    Food* targetFood;
 public:
-    void Enter(Cat* cat) override;
-    void Update(Cat* cat) override;
+    EatState(Food* food) : targetFood(food) {}
+    void Enter(Cat* cat) override {
+        targetFood->owner = &cat;
+    }
+    void Update(Cat* cat) override {}
     void Exit(Cat* cat) override;
 }

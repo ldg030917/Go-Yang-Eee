@@ -185,3 +185,26 @@ void HuntState::Update(Cat* cat) {
         return;
     }
 }
+
+// 음식을 탐색하는 헬퍼 함수
+Food* HuntState::findNearestFood(Cat* cat) {
+    auto& gm = GameManager::get();
+    Food* nearest = nullptr;
+    float minDist = 99999;
+
+    for (auto& food : gm.foods) {
+        if (food.owner == nullptr) continue;
+
+        float dist = distance(cat->x, cat->y, food.x, food.y);
+        if (dist < minDist && dist < 200) {
+            minDist = dist;
+            nearest = &food;
+        }
+    }
+    return nearest;
+}
+
+void EatState::Update(Cat* cat) {
+    // cat hunger 증가
+    
+}

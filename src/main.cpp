@@ -344,6 +344,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
         case ID_FISHING_ROD_TOGGLE: {
             auto& gm = GameManager;
+            gm.ToggleFishingRod();
             // 토글 추가
         }
         } // end switch
@@ -359,7 +360,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         else if (wParam == ID_HOTKEY_REMOVE) {
             SendMessage(hwnd, WM_COMMAND, ID_REMOVE_CAT, 0);
         }
-        else if (wParam == ID_FISHING_ROD_TOGGLE) {
+        else if (wParam == ID_HOTKEY_TOGGLE_FISHING_ROD) {
             SendMessage(hwnd, WM_COMMAND, ID_FISHING_ROD_TOGGLE)
         }
         return 0;
@@ -431,6 +432,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         // (4) 관리 리스트에 추가
         cats.push_back(newCat);
     }
+
+    
 
     // 5. 메시지 루프 (모든 창의 메시지를 여기서 처리)
     // [수정: 게임 루프]

@@ -16,7 +16,7 @@ public:
     std::vector<Cat*> cats;
     std::vector<Food> foods;
 
-    void toggle_fishing_rod();
+    void toggle_fishing_rod() { fishingRodActive = !fishingRodActive; }
     
 private:
     GameManager() : fishingRod(nullptr), fishingRodActive(false) {}

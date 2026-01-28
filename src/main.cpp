@@ -192,6 +192,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT rc; GetClientRect(hwnd, &rc);
         int w = rc.right - rc.left;
         int h = rc.bottom - rc.top;
+        
+        auto& gm = GameManager::get();
+        if (gm.fishingRodActive && gm.fishingRod) {
+            Graphics g(hdc);
+            gm.fishingRod->Render(g);
+        }
+        
         pCat->Render(hdc, w, h);
         
         EndPaint(hwnd, &ps);
@@ -345,6 +352,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         case ID_FISHING_ROD_TOGGLE: {
             auto& gm = GameManager;
             gm.ToggleFishingRod();
+            ToggleFishingRod();
             // 토글 추가
         }
         } // end switch
@@ -455,6 +463,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
             if (currentTime - lastTime >= 16) {
                 lastTime = currentTime; // 시간 갱신
                 
+
+                auto& gm = GameManager::get();
+
+                // 낚싯대 마우스 따라다니기
+                if (gm.fishingRodActive && gm.fishingRod) {
+                    gm.fishingRod->Update(16);
+                }
+
                 // ★ 모든 고양이 업데이트 (Update 함수 별도 분리 필요)
                 for (Cat* cat : cats) {
                     cat->Update(); // 물리, AI 등 계산

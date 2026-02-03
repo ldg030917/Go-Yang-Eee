@@ -142,7 +142,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // 핫키 등록...
             RegisterHotKey(hwnd, ID_HOTKEY_ADD, MOD_CONTROL | MOD_ALT, 'C');
             RegisterHotKey(hwnd, ID_HOTKEY_REMOVE, MOD_CONTROL | MOD_ALT, 'D');
-            RegisterHotKey(hwnd, ID_FISHING_ROD_TOGGLE, MOD_CONTROL | MOD_ALT, 'F'); // Ctrl+Alt+F
+            RegisterHotKey(hwnd, ID_TOGGLE_FISHING_ROD, MOD_CONTROL | MOD_ALT, 'F'); // Ctrl+Alt+F
         }
         return 0;
     }
@@ -349,14 +349,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             }
             break;
         }
-        case ID_FISHING_ROD_TOGGLE: {
-<<<<<<< HEAD
+        case ID_TOGGLE_FISHING_ROD: {
             auto& gm = GameManager::get();
-=======
-            auto& gm = GameManager;
-            gm.ToggleFishingRod();
-            ToggleFishingRod();
->>>>>>> c448b4e8f25e4bf4c309b1457c32d77b6f21511f
+            gm.toggle_fishing_rod();
             // 토글 추가
         }
         } // end switch
@@ -372,13 +367,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         else if (wParam == ID_HOTKEY_REMOVE) {
             SendMessage(hwnd, WM_COMMAND, ID_REMOVE_CAT, 0);
         }
-<<<<<<< HEAD
-        else if (wParam == ID_FISHING_ROD_TOGGLE) {
-            SendMessage(hwnd, WM_COMMAND, ID_FISHING_ROD_TOGGLE, 0);
-=======
         else if (wParam == ID_HOTKEY_TOGGLE_FISHING_ROD) {
-            SendMessage(hwnd, WM_COMMAND, ID_FISHING_ROD_TOGGLE)
->>>>>>> c448b4e8f25e4bf4c309b1457c32d77b6f21511f
+            SendMessage(hwnd, WM_COMMAND, ID_TOGGLE_FISHING_ROD, 0);
         }
         return 0;
     }

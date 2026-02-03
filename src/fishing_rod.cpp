@@ -71,5 +71,5 @@ bool FishingRod::IsToyNear(Cat* cat) {
     POINT toyPos = GetToyPosition();
     float dx = toyPos.x - cat->posX;
     float dy = toyPos.y - cat->posY;
-    return sqrt(dx * dx + dy * dy) < 60.0f; // 고양이 머리 크기
+    return sqrt(dx * dx + dy * dy) < 300.0f;
 }

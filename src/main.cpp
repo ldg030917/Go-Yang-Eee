@@ -343,7 +343,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
         }
         case ID_FISHING_ROD_TOGGLE: {
-            auto& gm = GameManager;
+            auto& gm = GameManager::get();
             // 토글 추가
         }
         } // end switch
@@ -360,7 +360,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SendMessage(hwnd, WM_COMMAND, ID_REMOVE_CAT, 0);
         }
         else if (wParam == ID_FISHING_ROD_TOGGLE) {
-            SendMessage(hwnd, WM_COMMAND, ID_FISHING_ROD_TOGGLE)
+            SendMessage(hwnd, WM_COMMAND, ID_FISHING_ROD_TOGGLE, 0);
         }
         return 0;
     }

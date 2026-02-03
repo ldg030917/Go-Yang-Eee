@@ -29,8 +29,10 @@ extern int winH;
 #define ID_EXIT 2001
 #define ID_ADD_CAT 2002
 #define ID_REMOVE_CAT 2003
+#define ID_TOGGLE_FISHING_ROD 2004
 #define ID_HOTKEY_ADD 9001
 #define ID_HOTKEY_REMOVE 9002
+#define ID_HOTKEY_TOGGLE_FISHING_ROD 9003
 const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 
 // ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!
@@ -64,6 +66,3 @@ enum ActionType {
 };
 
 const int ACTION_FRAMES[MAX_ACTIONS] = {4, 4, 4, 4, 8, 8, 4, 6, 7, 8, 4, 8, 4, 5};
-
-// 임시
-#define ID_FISHING_ROD_TOGGLE 9003

@@ -192,6 +192,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         RECT rc; GetClientRect(hwnd, &rc);
         int w = rc.right - rc.left;
         int h = rc.bottom - rc.top;
+        
+        auto& gm = GameManager::get();
+        if (gm.fishingRodActive && gm.fishingRod) {
+            Graphics g(hdc);
+            gm.fishingRod->Render(g);
+        }
+        
         pCat->Render(hdc, w, h);
         
         EndPaint(hwnd, &ps);
@@ -343,7 +350,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
         }
         case ID_FISHING_ROD_TOGGLE: {
+<<<<<<< HEAD
             auto& gm = GameManager::get();
+=======
+            auto& gm = GameManager;
+            gm.ToggleFishingRod();
+            ToggleFishingRod();
+>>>>>>> c448b4e8f25e4bf4c309b1457c32d77b6f21511f
             // 토글 추가
         }
         } // end switch
@@ -359,8 +372,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         else if (wParam == ID_HOTKEY_REMOVE) {
             SendMessage(hwnd, WM_COMMAND, ID_REMOVE_CAT, 0);
         }
+<<<<<<< HEAD
         else if (wParam == ID_FISHING_ROD_TOGGLE) {
             SendMessage(hwnd, WM_COMMAND, ID_FISHING_ROD_TOGGLE, 0);
+=======
+        else if (wParam == ID_HOTKEY_TOGGLE_FISHING_ROD) {
+            SendMessage(hwnd, WM_COMMAND, ID_FISHING_ROD_TOGGLE)
+>>>>>>> c448b4e8f25e4bf4c309b1457c32d77b6f21511f
         }
         return 0;
     }
@@ -432,6 +450,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         cats.push_back(newCat);
     }
 
+    
+
     // 5. 메시지 루프 (모든 창의 메시지를 여기서 처리)
     // [수정: 게임 루프]
     MSG msg = { };
@@ -452,6 +472,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
             if (currentTime - lastTime >= 16) {
                 lastTime = currentTime; // 시간 갱신
                 
+
+                auto& gm = GameManager::get();
+
+                // 낚싯대 마우스 따라다니기
+                if (gm.fishingRodActive && gm.fishingRod) {
+                    gm.fishingRod->Update(16);
+                }
+
                 // ★ 모든 고양이 업데이트 (Update 함수 별도 분리 필요)
                 for (Cat* cat : cats) {
                     cat->Update(); // 물리, AI 등 계산

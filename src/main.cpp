@@ -380,6 +380,34 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
 
+LRESULT CALLBACK RodWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    switch (uMsg) {
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+        // 전체화면 채우기
+        RECT rc; GetClientRect(hwnd, &rc);
+        HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 255));
+        FillRect(hdc, &rc, hBrush);
+        DeleteObject(hBrush);
+
+        // 낚싯대 그리기
+        auto& gm = GameManager::get();
+        if (gm.fishingRodActive && gm.fishingRod) {
+            Graphics g(hdc);
+            gm.fishingRod->Render(g);
+        }
+
+        EndPaint(hwnd, &ps);
+        return 0;
+    }
+    case WM_ERASEBKGND:
+        return 1;   // 깜빡임 방지
+    }
+    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+}
+
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine, int nCmdShow) {
     // 1. GDI+ 초기화
     GdiplusStartupInput gdiplusStartupInput;
@@ -412,6 +440,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
 
     RECT workArea;
     SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, 0);
+
+    // 고양이 추가하기 전에 낚싯대 클래스 등록
+    WNDCLASSEXW rodWc = { sizeof(WNDCLASSEXW) };
+    rodWc.lpfnWndProc = RodWindowProc;
+    rodWc.hInstance = hInstance;
+    rodWc.lpszClassName = L"RodOverlayWindow";
+    rodWc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    rodWc.hbrBackground = CreateSolidBrush(RGB(255, 0, 255));
+    RegisterClassExW(&rodWc);
+
+    // 낚싯대 윈도우 생성 TODO
+    HWND hRodWnd = CreateWindowExW(
+        WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
+        L"RodOverlayWindow", L"RodOverlayWindow", WS_POPUP,
+        0, 0, screenW, screenH, // 화면 전체 크기
+        NULL, NULL, hInstance, NULL
+    );
+    // 투명화 설정
+    SetLayeredWindowAttributes(hRodWnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
+    //showfishingrod는 toggle에서 추가
 
     // ★ 4. 고양이 3마리 생성 및 창 띄우기
     int startX = workArea.right - winW - 500;

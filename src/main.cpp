@@ -7,6 +7,8 @@
 #include "cat_states.h"
 #include "game_manager.h"
 
+#include <iostream>
+
 
 #pragma comment(lib, "wininet.lib")
 
@@ -142,7 +144,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // 핫키 등록...
             RegisterHotKey(hwnd, ID_HOTKEY_ADD, MOD_CONTROL | MOD_ALT, 'C');
             RegisterHotKey(hwnd, ID_HOTKEY_REMOVE, MOD_CONTROL | MOD_ALT, 'D');
-            RegisterHotKey(hwnd, ID_TOGGLE_FISHING_ROD, MOD_CONTROL | MOD_ALT, 'F'); // Ctrl+Alt+F
+            RegisterHotKey(hwnd, ID_HOTKEY_TOGGLE_FISHING_ROD, MOD_CONTROL | MOD_ALT, 'F'); // Ctrl+Alt+F
         }
         return 0;
     }
@@ -353,6 +355,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             auto& gm = GameManager::get();
             gm.toggle_fishing_rod();
             // 토글 추가
+            std::cout << "AA" << std::endl;
         }
         } // end switch
         return 0;

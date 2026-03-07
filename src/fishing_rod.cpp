@@ -49,8 +49,8 @@ void FishingRod::SetMouseTarget(float mx, float my) {
 }
 
 void FishingRod::Render(Graphics& g) {
-    Pen rodPen(Color(139, 69, 19), 3.0f); // 갈색 낚싯대
-    Pen toyPen(Color(255, 255, 0), 8.0f); // 노란색 장난감
+    Pen rodPen(Color(255, 139, 69, 19), 3.0f); // 갈색 낚싯대
+    Pen toyPen(Color(255, 255, 255, 0), 8.0f); // 노란색 장난감
 
     // 낚싯대 선 그리기
     for (int i = 0; i < num_segments; i++) {
@@ -65,6 +65,7 @@ void FishingRod::Render(Graphics& g) {
         Point toyPos((int)toy->x, (int)toy->y);
         g.DrawEllipse(&toyPen, toyPos.X - 8, toyPos.Y - 8, 16, 16);
     }
+
 }
 
 bool FishingRod::IsToyNear(Cat* cat) {

@@ -6,6 +6,7 @@
 #include "config.h"
 #include "cat_states.h"
 #include "game_manager.h"
+#include "inventory_ui.h"
 
 #include <iostream>
 
@@ -388,6 +389,7 @@ LRESULT CALLBACK RodWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
         // 전체화면 채우기
         RECT rc; GetClientRect(hwnd, &rc);
+
         HBRUSH hBrush = CreateSolidBrush(RGB(255, 0, 255));
         FillRect(hdc, &rc, hBrush);
         DeleteObject(hBrush);
@@ -459,7 +461,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     );
     // 투명화 설정
     SetLayeredWindowAttributes(hRodWnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
+    auto& gm = GameManager::get();
+    gm.gRodWnd = hRodWnd;
+    //ShowWindow(hRodWnd, SW_SHOW);
     //showfishingrod는 toggle에서 추가
+
+    InitInventoryWindow(hInstance);
 
     // ★ 4. 고양이 3마리 생성 및 창 띄우기
     int startX = workArea.right - winW - 500;

@@ -1,3 +1,6 @@
-101 ICON "icon.ico"
-102 RCDATA "angora.png"
-103 RCDATA "siam.png"
+#include "resource.h"
+
+IDI_ICON ICON "icon.ico"
+IDB_CAT_ANGORA RCDATA "angora.png"
+IDB_CAT_SIAM RCDATA "siam.png"
+IDB_UI_BACKGROUND RCDATA "paper.png"

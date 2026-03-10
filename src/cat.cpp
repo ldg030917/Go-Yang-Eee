@@ -4,7 +4,7 @@
 #include "cat_states.h"
 #include <cmath>
 
-Cat::Cat(int startX, int startY, int type, HINSTANCE hInstance)
+Cat::Cat(int startX, int startY, int type, Image* SharedImage)
     :posX(startX), 
     posY(startY), 
     catType(type), 
@@ -46,27 +46,10 @@ Cat::Cat(int startX, int startY, int type, HINSTANCE hInstance)
         break;
     }
 
-    // 이미지 로딩 (기존 LoadImageFromResource 로직 활용)
-    HRSRC hResource = FindResource(hInstance, MAKEINTRESOURCE(catType), RT_RCDATA);
-    if (hResource) {
-        DWORD imageSize = SizeofResource(hInstance, hResource);
-        HGLOBAL hGlobal = LoadResource(hInstance, hResource);
-        void* pData = LockResource(hGlobal);
-        HGLOBAL hBuffer = GlobalAlloc(GMEM_MOVEABLE, imageSize);
-        if (hBuffer) {
-            void* pBuffer = GlobalLock(hBuffer);
-            CopyMemory(pBuffer, pData, imageSize);
-            GlobalUnlock(hBuffer);
-            if (CreateStreamOnHGlobal(hBuffer, TRUE, &myStream) == S_OK) {
-                myImage = Image::FromStream(myStream);
-            }
-        }
-    }
+    myImage = SharedImage;
 }
 
 Cat::~Cat() {
-    if (myImage) delete myImage;
-    if (myStream) myStream->Release();
     if (currentState) {
         currentState->Exit(this);
         delete currentState;    // 상태 객체 메모리 해제

@@ -1,7 +1,8 @@
 #include "inventory_ui.h"
 #include "utils.h"
 #include "resource.h"
-#include <gdiplus.h>
+#include "game_manager.h"
+#include <vector>
 
 using namespace Gdiplus;
 
@@ -9,8 +10,11 @@ using namespace Gdiplus;
 // 나중에 UI 클래스를 따로 만들면 멤버 변수로 넣는 게 더 좋음
 static Image* bgImage = nullptr;
 static IStream* bgStream = nullptr;
+static std::vector<UIButton> buttons;
 
 LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    auto& gm = GameManager::get();
+
     switch (uMsg) {
     case WM_CREATE: {
         // 2. 창이 생성될 때 딱 한 번! 하드디스크에서 이미지를 읽어와서 메모리에 올림.
@@ -22,6 +26,8 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 
         // TODO: 나중에 여기에 고양이 버튼 1, 2, 3 이미지도 똑같이 로드하면 됨 
         // 버튼 생성해서 벡터에 넣어줌
+        Image* image = gm.GetCatImage(102);
+        buttons.push_back(UIButton(20, 20, 102, image, nullptr));
 
         // catBtn1 = LoadImageFromResource(hInst, IDB_CAT_BTN1, &catStream1);
         return 0;
@@ -39,7 +45,13 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
         }
 
         // 2. 낚싯대 토글 버튼 이미지 그리기
+        
         // 3. 보유 중인 32x32 도트 고양이 에셋들을 슬롯에 맞춰 그리기
+        for (auto& btn : buttons) {
+            if (btn.imgNormal) {
+                g.DrawImage(btn.imgNormal, Rect(btn.x, btn.y, btn.width, btn.height), 0, 0, 32, 32, UnitPixel);
+            }
+        }
 
         EndPaint(hwnd, &ps);
         break;

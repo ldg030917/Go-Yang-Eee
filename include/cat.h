@@ -32,7 +32,6 @@ public:
     int animTimer; // 애니메이션 타이머 (개별 동작 위해)
     int catType;   // 102(치즈), 103(검정) 등 리소스 ID
     Image* myImage = nullptr; // 자기만의 이미지 포인터 (혹은 공유 가능)
-    IStream* myStream = nullptr;
 
     // 성격 스텟
     int energy; // 활동성
@@ -53,7 +52,7 @@ public:
     Cat* partner = nullptr; // 현재 상호작용 중인 상대 고양이
     bool isGrooming = false; // 내가 그루밍해주는 쪽인가
 
-    Cat(int startX, int startY, int type, HINSTANCE hInstance);
+    Cat(int startX, int startY, int type, Image* sharedImage);
     ~Cat();
     // FSM 제어
     void ChangeState(CatState* newState);

@@ -4,6 +4,7 @@
 #include <shellapi.h> // Shell_NotifyIcon 용 (트레이 아이콘)
 #include <wininet.h> // 업데이트 체크용 인터넷 라이브러리
 #include "config.h"
+#include "resource.h"
 #include "cat_states.h"
 #include "game_manager.h"
 #include "inventory_ui.h"
@@ -115,7 +116,7 @@ void InitTrayIcon(HWND hwnd) {
     nid.uCallbackMessage = WM_TRAYICON; // 이 메시지로 알림을 받겠다
     
     // 아이콘 로드 (본인 아이콘 있으면 LoadImage로 교체, 지금은 기본 느낌표 아이콘)
-    nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(ID_MY_ICON)); 
+    nid.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(IDI_ICON)); 
     
     // 마우스 올렸을 때 툴팁
     lstrcpyW(nid.szTip, L"Go-Yang-Eee");
@@ -412,7 +413,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     GdiplusStartupInput gdiplusStartupInput;
     ULONG_PTR gdiplusToken;
     GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
-    
+
+    // 이미지 로딩
+    auto& gm = GameManager::get();
+    gm.LoadAllAssets(hInstance);
+
     srand((unsigned int)time(NULL));
 
     // 2. 윈도우 클래스 등록
@@ -422,7 +427,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     wc.lpszClassName = CLASS_NAME;
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = CreateSolidBrush(RGB(255, 0, 255));
-    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(ID_MY_ICON));
+    wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON));
     
     // 업데이트 확인
     CheckForUpdate(NULL); 
@@ -458,7 +463,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     );
     // 투명화 설정
     SetLayeredWindowAttributes(hRodWnd, RGB(255, 0, 255), 0, LWA_COLORKEY);
-    auto& gm = GameManager::get();
     gm.gRodWnd = hRodWnd;
     //ShowWindow(hRodWnd, SW_SHOW);
     //showfishingrod는 toggle에서 추가

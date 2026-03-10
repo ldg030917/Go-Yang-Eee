@@ -219,6 +219,8 @@ void Cat::Render(HDC hdc, int w, int h) {
     graphics.SetPixelOffsetMode(PixelOffsetModeHalf);
 
     // 4. 고양이 그리기 로직
+    if (myImage == nullptr) printf("shit");
+
     if (myImage != nullptr) {
         int drawW = (int)(FRAME_WIDTH * SCALE);
         int drawH = (int)(FRAME_HEIGHT * SCALE);

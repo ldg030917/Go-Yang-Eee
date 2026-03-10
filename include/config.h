@@ -25,7 +25,6 @@ extern int winH;
 // 다운로드 페이지 URL
 #define DOWNLOAD_URL L"https://ldg030917.itch.io/go-yang-eee"
 #define WM_TRAYICON (WM_USER + 1) // 트레이 아이콘 메시지 ID
-#define ID_MY_ICON 101
 #define ID_EXIT 2001
 #define ID_ADD_CAT 2002
 #define ID_REMOVE_CAT 2003

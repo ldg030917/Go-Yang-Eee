@@ -1,14 +1,14 @@
-#pragma once
 #include "game_manager.h"
 #include "utils.h"
+#include "resource.h"
 
 void GameManager::LoadAllAssets(HINSTANCE hInstance) {
-    std::vector<int> catTypes = { } //IDB_CAT_CHEESE, IDB_CAT_SIAM
-    
-    for (int type : catTypes) {
+    for (int i = IDB_CAT_START; i <= IDB_CAT_END; i++) {
         CatAsset asset;
-        asset.image = LoadImageFromResource(hInstance, type, &asset.stream);
-        catAssets[type] = asset;
+        asset.image = LoadImageFromResource(hInstance, i, &asset.stream);
+        if (asset.image != nullptr) {
+            catAssets[i] = asset;
+        }
     }
 }
 

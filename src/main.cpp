@@ -132,6 +132,7 @@ void RemoveTrayIcon(HWND hwnd) {
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    auto& gm = GameManager::get();
     Cat* pCat = NULL;
     if (uMsg == WM_CREATE) {
         CREATESTRUCT* pCreate = (CREATESTRUCT*)lParam;
@@ -196,7 +197,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int w = rc.right - rc.left;
         int h = rc.bottom - rc.top;
         
-        auto& gm = GameManager::get();
         if (gm.fishingRodActive && gm.fishingRod) {
             Graphics g(hdc);
             gm.fishingRod->Render(g);
@@ -316,9 +316,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             int startX = (workArea.right / 2) + (rand() % 200 - 100);
             int startY = workArea.bottom - 200;
             int type = (rand() % 2 == 0) ? 102 : 103;
-            
+            Image* image = gm.GetCatImage(type);
+            Cat* newCat = new Cat(startX, startY, type, image);
+
             HINSTANCE hInst = GetModuleHandle(NULL);
-            Cat* newCat = new Cat(startX, startY, type, hInst);
             
             newCat->hwnd = CreateWindowExW(
                 WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
@@ -342,9 +343,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 // 윈도우 파괴
                 if (victim->hwnd) DestroyWindow(victim->hwnd);
                 
-                // 메모리 정리
-                if (victim->myImage) delete victim->myImage;
-                if (victim->myStream) victim->myStream->Release();
                 delete victim;                
                 
                 // 0마리 되면 종료할지? (선택사항)
@@ -353,7 +351,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
         }
         case ID_TOGGLE_FISHING_ROD: {
-            auto& gm = GameManager::get();
             gm.toggle_fishing_rod();
             // 토글 추가
             std::cout << "AA" << std::endl;
@@ -382,6 +379,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 LRESULT CALLBACK RodWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    auto& gm = GameManager::get();
     switch (uMsg) {
     case WM_PAINT: {
         PAINTSTRUCT ps;
@@ -395,7 +393,6 @@ LRESULT CALLBACK RodWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
         DeleteObject(hBrush);
 
         // 낚싯대 그리기
-        auto& gm = GameManager::get();
         if (gm.fishingRodActive && gm.fishingRod) {
             Graphics g(hdc);
             gm.fishingRod->Render(g);
@@ -476,9 +473,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         // (1) 고양이 객체 생성
         // 리소스 ID: 랜덤
         int resId = rand() % 2 == 1 ? 103 : 102; 
-        
+        Image* new_image = GameManager::get().GetCatImage(resId);
+
         // 생성자에서 posX, posY, 리소스 로딩까지 다 함
-        Cat* newCat = new Cat(startX - (i * 10), startY, resId, hInstance);
+        Cat* newCat = new Cat(startX - (i * 10), startY, resId, new_image);
         
         // (2) 윈도우 생성 (중요: 마지막 인자에 newCat 포인터 전달)
         newCat->hwnd = CreateWindowExW(
@@ -519,9 +517,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
             // 16ms(60FPS)가 지났는지 확인
             if (currentTime - lastTime >= 16) {
                 lastTime = currentTime; // 시간 갱신
-                
-
-                auto& gm = GameManager::get();
 
                 // 낚싯대 마우스 따라다니기
                 if (gm.fishingRodActive && gm.fishingRod) {
@@ -549,10 +544,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     // 6. 종료 정리 (모든 고양이 메모리 해제)
     for (Cat* c : cats) {
         if (c->myImage) delete c->myImage;
-        if (c->myStream) c->myStream->Release();
         delete c;
     }
     cats.clear();
+
+    gm.ReleaseAllAssets();
 
     GdiplusShutdown(gdiplusToken);
     //MessageBoxW(NULL, L"정상 종료됨", L"알림", MB_OK); // 이거 뜨면 정상

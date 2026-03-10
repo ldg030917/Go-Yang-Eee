@@ -1,5 +1,8 @@
 #pragma once
 #include <windows.h>
+#include <gdiplus.h>
+
+using namespace Gdiplus;
 
 // 인벤토리 창의 메시지를 처리할 윈도우 프로시저
 LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -33,4 +36,4 @@ public:
             g.DrawImage(imgNormal, x, y, width, height);
         }
     }
-}
+};

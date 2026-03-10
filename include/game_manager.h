@@ -2,9 +2,11 @@
 #pragma once
 #include <vector>
 #include <unordered_map>
+#include <windows.h>
 #include <gdiplus.h>
 #include "fishing_rod.h"
 #include "cat.h"
+#include "food.h"
 
 struct CatAsset {
     Gdiplus::Image* image = nullptr;
@@ -57,7 +59,7 @@ public:
     
 private:
     std::unordered_map<int, CatAsset> catAssets;
-
+    
     GameManager() : fishingRod(nullptr), fishingRodActive(false) {}
     ~GameManager() = default;
 };

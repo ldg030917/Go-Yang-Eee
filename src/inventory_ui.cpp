@@ -5,8 +5,8 @@
 
 using namespace Gdiplus;
 
-// 1. 이미지를 들고 있을 포인터를 전역 변수(또는 정적 변수)로 선언해둬.
-// (나중에 UI 클래스를 따로 만들면 멤버 변수로 넣는 게 더 좋지만, 지금은 직관적으로 갈게)
+// 이미지를 들고 있을 포인터를 전역 변수(또는 정적 변수)로 선언
+// 나중에 UI 클래스를 따로 만들면 멤버 변수로 넣는 게 더 좋음
 static Image* bgImage = nullptr;
 static IStream* bgStream = nullptr;
 
@@ -20,7 +20,9 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
         // 1. 헬퍼 함수를 써서 배경 이미지 로드! 코드가 딱 한 줄로 끝남.
         bgImage = LoadImageFromResource(hInst, IDB_UI_BACKGROUND, &bgStream);
 
-        // TODO: 나중에 여기에 고양이 버튼 1, 2, 3 이미지도 똑같이 로드하면 됨
+        // TODO: 나중에 여기에 고양이 버튼 1, 2, 3 이미지도 똑같이 로드하면 됨 
+        // 버튼 생성해서 벡터에 넣어줌
+
         // catBtn1 = LoadImageFromResource(hInst, IDB_CAT_BTN1, &catStream1);
         return 0;
     }

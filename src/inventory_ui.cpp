@@ -31,7 +31,9 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
         Image* image = gm.GetCatImage(102);
         buttons.push_back(UIButton(20, 20, 102, image, nullptr));
 
-        // catBtn1 = LoadImageFromResource(hInst, IDB_CAT_BTN1, &catStream1);
+        auto& gm = GameManager::get();
+        buttons.push_back(UIButton(20, 80, 1, image, nullptr));
+
         return 0;
     }
     case WM_PAINT: {
@@ -47,9 +49,22 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
         }
 
         // 2. 낚싯대 토글 버튼 이미지 그리기
+
+        
         
         // 3. 보유 중인 32x32 도트 고양이 에셋들을 슬롯에 맞춰 그리기
         for (auto& btn : buttons) {
+            if (btn.catType == 1) {
+                // 켜져 있으면 녹색 테두리, 꺼져 있으면 빨간색 테두리 (임시 연출)
+                Color statusColor = gm.fishingRodActive ? Color(255, 0, 255, 0) : Color(255, 255, 0, 0);
+                Pen statusPen(statusColor, 2);
+                g.DrawRectangle(&statusPen, btn.x, btn.y, btn.width, btn.height);
+
+                // "ROD" 글자 써주기 (이미지 없을 때 임시용)
+                Font font(L"Arial", 10);
+                SolidBrush white(Color(255, 255, 255, 255));
+                g.DrawString(L"ROD", -1, &font, PointF(btn.x + 2, btn.y + 8), &white);
+            }
             if (btn.imgNormal) {
                 g.DrawImage(btn.imgNormal, Rect(btn.x, btn.y, btn.width, btn.height), 0, 0, 32, 32, UnitPixel);
             }
@@ -64,9 +79,15 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
         int y = GET_Y_LPARAM(lParam);
         for (auto& btn: buttons) {
             if (btn.Contains(x, y)) {
-                HWND hMainWnd = FindWindowW(MAIN_WND_CLASS, NULL); 
-                if (hMainWnd) {
-                    PostMessage(hMainWnd, WM_COMMAND, ID_ADD_CAT, btn.catType);
+                if (btn.catType == 1) {
+                    gm.toggle_fishing_rod();
+                    // 화면을 즉시 다시 그려서 테두리 색깔을 바꿈
+                    InvalidateRect(hwnd, NULL, FALSE);
+                } else {
+                    HWND hMainWnd = FindWindowW(MAIN_WND_CLASS, NULL); 
+                    if (hMainWnd) {
+                        PostMessage(hMainWnd, WM_COMMAND, ID_ADD_CAT, btn.catType);
+                    }
                 }
             }
         }

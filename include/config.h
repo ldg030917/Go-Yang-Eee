@@ -32,6 +32,8 @@ extern int winH;
 #define ID_HOTKEY_ADD 9001
 #define ID_HOTKEY_REMOVE 9002
 #define ID_HOTKEY_TOGGLE_FISHING_ROD 9003
+
+#define MAIN_WND_CLASS L"Go-Yang-Eee"
 const int ID_TRAY_ICON = 1001;    // 트레이 아이콘 식별 번호
 
 // ★ 설정: 본인 아틀라스 이미지에 맞게 수정하세요!

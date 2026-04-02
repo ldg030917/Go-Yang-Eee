@@ -1,8 +1,10 @@
+#include "config.h"
 #include "inventory_ui.h"
 #include "utils.h"
 #include "resource.h"
 #include "game_manager.h"
 #include <vector>
+#include <windowsx.h>
 
 using namespace Gdiplus;
 
@@ -57,30 +59,24 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
         break;
     }
     case WM_LBUTTONDOWN: {
-        // // 마우스 클릭한 x, y 좌표 가져오기
-        // int x = GET_X_LPARAM(lParam);
-        // int y = GET_Y_LPARAM(lParam);
-
-        // // [충돌 검사] 클릭한 좌표가 어떤 버튼 영역 안에 있는지 수학적으로 계산
-        
-        // // ex) 낚싯대 버튼 영역(x: 10~110, y: 10~50)을 클릭했다면?
-        // if (x >= 10 && x <= 110 && y >= 10 && y <= 50) {
-        //     auto& gm = GameManager::get();
-        //     gm.toggle_fishing_rod();
-        //     InvalidateRect(hwnd, NULL, FALSE); // 버튼 상태(ON/OFF) 갱신을 위해 다시 그리기
-        // }
-        
-        // // ex) 1번 고양이 슬롯을 클릭했다면?
-        // // 메인 윈도우나 게임 로직으로 고양이 스폰 명령을 보냄
-        // // SendMessage(메인창HWND, WM_COMMAND, ID_ADD_CAT, 고양이타입);
-        // return 0;
+        // 마우스 클릭한 x, y 좌표 가져오기
+        int x = GET_X_LPARAM(lParam);
+        int y = GET_Y_LPARAM(lParam);
+        for (auto& btn: buttons) {
+            if (btn.Contains(x, y)) {
+                HWND hMainWnd = FindWindowW(MAIN_WND_CLASS, NULL); 
+                if (hMainWnd) {
+                    PostMessage(hMainWnd, WM_COMMAND, ID_ADD_CAT, btn.catType);
+                }
+            }
+        }
     }
-    // 창을 마우스로 잡고 이동할 수 있게 하려면 (타이틀바가 없는 커스텀 창인 경우)
-    case WM_NCHITTEST: {
-        LRESULT hit = DefWindowProc(hwnd, uMsg, wParam, lParam);
-        if (hit == HTCLIENT) return HTCAPTION; // 창 안쪽을 잡아도 드래그되게 만듦
-        return hit;
-    }
+    // // 창을 마우스로 잡고 이동할 수 있게 하려면 (타이틀바가 없는 커스텀 창인 경우)
+    // case WM_NCHITTEST: {
+    //     LRESULT hit = DefWindowProc(hwnd, uMsg, wParam, lParam);
+    //     if (hit == HTCLIENT) return HTCAPTION; // 창 안쪽을 잡아도 드래그되게 만듦
+    //     return hit;
+    // }
 
     case WM_DESTROY:
         // 인벤토리 창이 닫힐 때의 처리 (숨기기만 할지, 프로그램을 끌지 결정)
@@ -99,7 +95,6 @@ void InitInventoryWindow(HINSTANCE hInstance) {
     // 윈도우 배경색을 마젠타(RGB 255, 0, 255)로 칠함 (나중에 투명해질 색상)
     uiWc.hbrBackground = CreateSolidBrush(RGB(255, 0, 255));
     RegisterClassExW(&uiWc);
-
     // 2. UI 창 생성 및 띄우기
     HWND hInventoryWnd = CreateWindowExW(
         WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,

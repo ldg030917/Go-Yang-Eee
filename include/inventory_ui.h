@@ -16,6 +16,7 @@ public:
     int width = 32;  // 기본 크기 고정!
     int height = 32;
     bool isHovered = false;
+    bool isActive = false;  // 각 버튼이 각 고양이를 소환한 상태인지 아닌지 정하는 변수
     int catType;     // 이 버튼이 어떤 고양이를 소환하는지 (예: IDB_CAT_SIAM)
     Image* imgNormal;
     Image* imgHover;

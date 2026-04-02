@@ -34,7 +34,7 @@ int debugDX = 0;
 int debugDY = 0;
 
 // 전역 변수
-const wchar_t CLASS_NAME[] = L"Go-Yang-Eee";
+const wchar_t CLASS_NAME[] = MAIN_WND_CLASS;
 
 // 버전 체크 함수
 void CheckForUpdate(HWND hwnd) {
@@ -316,7 +316,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             // 약간 랜덤한 위치에 스폰 (겹침 방지)
             int startX = (workArea.right / 2) + (rand() % 200 - 100);
             int startY = workArea.bottom - 200;
-            int type = (rand() % 2 == 0) ? 102 : 103;
+            int type = (lParam != 0) ? (int)lParam : ((rand() % 2 == 0) ? 102 : 103);
             Image* image = gm.GetCatImage(type);
             Cat* newCat = new Cat(startX, startY, type, image);
 

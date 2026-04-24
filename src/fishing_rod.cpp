@@ -9,44 +9,57 @@ FishingRod::FishingRod(int segments, float seg_length)
     for (int i = 0; i < num_segments; i++) {
         points.emplace_back(100 + i * seg_length, 100 + i * seg_length / 2);
     }
-    toy = new VerletPoint(points.back().x, points.back().y + seg_length);
+    toy = std::make_unique<VerletPoint>(points.back().x, points.back().y + seg_length);
 }
 
 void FishingRod::Update(float dt) {
-    // 1. 마우스 위치로 첫 번째 점 고정
-    printf("update rod");
-    POINT pt; GetCursorPos(&pt);
-    SetMouseTarget(pt.x, pt.y); // UI에서 전달받은 마우스 좌표로 변경
+    //printf("update rod");
+
+    // points[1]~points[n], toy 중력 적용
+    for (int i = 1; i < num_segments; i++) {
+        points[i].AddForce(0.0f, gravity);
+    }
+    toy->AddForce(0.0f, gravity * 5);
 
     // 2. 모든 점 물리 업데이트
     for (auto& p : points) p.Update(dt);
     toy->Update(dt);
 
     // 3. 제약조건: 낚싯대 세그먼트 길이 유지
-    for (int i = 0; i < num_segments; i++) {
-        VerletPoint& p1 = points[i];
-        VerletPoint* p2 = (i + 1 < num_segments) ? &points[i + 1] : toy;
-        
-        float dx = p2->x - p1.x;
-        float dy = p2->y - p1.y;
-        float dist = sqrt(dx * dx + dy * dy);
-        
-        if (dist > length) {
-            // 거리가 너무 길면 길이 맞춰서 끌어당김
-            float ratio = length / dist;
-            p2->x = p1.x + dx * ratio;
-            p2->y = p1.y + dy * ratio;
+    for (int k = 0; k < 10; k++) {
+        for (int i = 0; i < num_segments; i++) {
+            VerletPoint& p1 = points[i];
+            VerletPoint* p2 = (i + 1 < num_segments) ? &points[i + 1] : toy.get();
+            
+            float dx = p2->x - p1.x;
+            float dy = p2->y - p1.y;
+            float dist = sqrt(dx * dx + dy * dy);
+            if (dist < 0.001f) continue; // 거리가 0이면 나누기 오류 방지
+            
+            float diff = (dist - length) / dist;
+            float offsetX = dx * diff * 0.5f;
+            float offsetY = dy * diff * 0.5f;
+
+            // points[0]은 마우스 고정점 — 절대 움직이면 안 됨
+            if (i > 0) {
+                p1.x += offsetX;
+                p1.y += offsetY;
+            }
+            p2->x -= offsetX;
+            p2->y -= offsetY;
         }
     }
-
     // 4. 장난감 흔들림 추가 (스윙 효과)
-    toy->AddForce(sin(GetTickCount() * 0.01f) * 2.0f, cos(GetTickCount() * 0.01f) * 1.0f);
+    DWORD tick = GetTickCount(); // 한 번만 호출해서 캐싱
+    toy->AddForce(sin(tick * 0.003f) * 0.8f, 0.0f);
 }
 
 void FishingRod::SetMouseTarget(float mx, float my) {
     // UI에서 전달받은 마우스 위치로 낚싯대 끝 고정
     points[0].x = mx;
     points[0].y = my;
+    points[0].old_x = mx;
+    points[0].old_y = my;
 }
 
 void FishingRod::Render(Graphics& g) {

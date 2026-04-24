@@ -3,6 +3,7 @@
 #include <shlwapi.h> // IStream 변환용
 #include <shellapi.h> // Shell_NotifyIcon 용 (트레이 아이콘)
 #include <wininet.h> // 업데이트 체크용 인터넷 라이브러리
+#include <windowsx.h>
 #include "config.h"
 #include "resource.h"
 #include "cat_states.h"
@@ -21,9 +22,8 @@ using namespace Gdiplus;
 float gravity = 0.8f; // 중력 가속도
 
 // 화면 크기 (나중에 화면 밖으로 나가는 거 막으려고)
-int screenW = GetSystemMetrics(SM_CXSCREEN);
-int screenH = GetSystemMetrics(SM_CYSCREEN);
-
+int screenW = 0;
+int screenH = 0; 
 // ★ [수정] 위치와 크기를 관리할 전역 변수 추가
 int posX = 0; // 현재 윈도우 X 위치
 int posY = 0; // 현재 윈도우 Y 위치
@@ -230,11 +230,12 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
     case WM_MOUSEMOVE: {
         // 안전장치: 포인터 체크
         if (!pCat) return 0;
-        POINT pt; GetCursorPos(&pt);
         // lastCursorX도 개별 고양이마다 다를 수 있으니 pCat에 넣는 게 좋지만
         // 일단은 계산용으로 쓰임 (단, 동시 쓰다듬기 시 버그 가능성 있음)
         // 여기서는 간단히 처리:
-        
+        int mouseX = GET_X_LPARAM(lParam);
+        int mouseY = GET_Y_LPARAM(lParam);
+
         if (pCat->isDragging) {            
             // int newX = pt.x - pCat->dragOffset.x;
             // int newY = pt.y - pCat->dragOffset.y;
@@ -257,8 +258,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         }
         else {
             // 쓰다듬기 로직 (간소화)
-            int dx = abs(pt.x - pCat->lastCursorX);
-            int dy = abs(pt.y - pCat->lastCursorY);
+            int dx = abs(mouseX - pCat->lastCursorX);
+            int dy = abs(mouseY - pCat->lastCursorY);
             
             if (dx + dy > 0 && dx + dy < 100) {
                 pCat->rubCount += (dx + dy);
@@ -274,8 +275,8 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
                 }
             }
         }
-        pCat->lastCursorX = pt.x;
-        pCat->lastCursorY = pt.y;
+        pCat->lastCursorX = mouseX;
+        pCat->lastCursorY = mouseY;
         return 0;
     }
 
@@ -517,14 +518,22 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
         else {
             // 2. 메시지가 없을 때 -> 여기서 게임 로직을 돌림 (무한 반복)
             DWORD currentTime = GetTickCount();
-            
+            float dt = (float)(currentTime - lastTime);
             // 16ms(60FPS)가 지났는지 확인
-            if (currentTime - lastTime >= 16) {
+            if (dt >= 16) {
                 lastTime = currentTime; // 시간 갱신
 
                 // 낚싯대 마우스 따라다니기
                 if (gm.fishingRodActive && gm.fishingRod) {
-                    gm.fishingRod->Update(16);
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    ScreenToClient(gm.gRodWnd, &pt);
+
+                    gm.fishingRod->SetMouseTarget((float)pt.x, (float)pt.y);
+                    
+                    gm.fishingRod->Update(dt);
+                    
+                    InvalidateRect(gm.gRodWnd, NULL, FALSE);
                 }
 
                 // ★ 모든 고양이 업데이트 (Update 함수 별도 분리 필요)

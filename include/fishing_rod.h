@@ -2,6 +2,7 @@
 #pragma once
 #include "config.h"
 #include <vector>
+#include <memory>
 #include "cat.h"
 
 struct VerletPoint {
@@ -31,13 +32,18 @@ struct VerletPoint {
 class FishingRod {
 private:
     std::vector<VerletPoint> points; // 낚싯대 조각들 (세그먼트)
-    VerletPoint* toy; // 장난감 물체 (끝에 달린 것)
+    std::unique_ptr<VerletPoint> toy; // 장난감 물체 (끝에 달린 것)
     
     float length; // 한 세그먼트 길이
     int num_segments; // 낚싯대 세그먼트 수
 
+    // 낚싯대 이미지
+    Gdiplus::Image* rodImage;
+    Gdiplus::Image* toyImage;
+
 public:
     FishingRod(int segments = 10, float seg_length = 25.0f);
+    //~FishingRod();
     void Update(float dt);
     void SetMouseTarget(float mx, float my); // UI에서 마우스 좌표 전달
     void Render(Graphics& g); // 낚싯대와 장난감 그리기

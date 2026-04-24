@@ -80,7 +80,7 @@ LRESULT CALLBACK UIWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam
         for (auto& btn: buttons) {
             if (btn.Contains(x, y)) {
                 if (btn.catType == 1) {
-                    gm.toggle_fishing_rod();
+                    gm.toggleFishingRod();
                     // 화면을 즉시 다시 그려서 테두리 색깔을 바꿈
                     InvalidateRect(hwnd, NULL, FALSE);
                 } else {

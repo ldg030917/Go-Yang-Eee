@@ -38,7 +38,7 @@ public:
     std::vector<Cat*> cats;
     std::vector<Food> foods;
 
-    void toggle_fishing_rod() {
+    void toggleFishingRod() {
         if (fishingRodActive) {
             delete fishingRod;
             fishingRod = nullptr;

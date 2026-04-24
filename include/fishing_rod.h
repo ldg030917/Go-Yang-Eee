@@ -14,8 +14,8 @@ struct VerletPoint {
     
     void Update(float dt) {
         // Verlet Integration 핵심: 위치를 속도로 환산하여 물리 계산
-        vx = (x - old_x) * 0.99f; // 공기저항
-        vy = (y - old_y) * 0.99f;
+        vx = (x - old_x) * 0.98f; // 감쇠
+        vy = (y - old_y) * 0.98f;
         
         old_x = x;
         old_y = y;
@@ -50,8 +50,8 @@ public:
     bool IsToyNear(Cat* cat); // 고양이가 장난감 근처에 있는지 체크
     POINT GetToyPosition() { 
         POINT pt;
-        pt.x = toy->x;
-        pt.y = toy->y;
+        pt.x = (int)toy->x;
+        pt.y = (int)toy->y;
         return pt;
     }
 };

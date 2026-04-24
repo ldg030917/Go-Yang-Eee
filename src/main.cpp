@@ -83,22 +83,6 @@ void CheckForUpdate(HWND hwnd) {
 }
 
 std::vector<Cat*> cats;
-FishingRod* fishingRod = nullptr; // 낚싯대 포인터
-bool fishingRodActive = false;    // 활성화 여부
-
-void ToggleFishingRod() {
-    auto& gm = GameManager::get();
-    if (gm.fishingRodActive) {
-        delete gm.fishingRod;
-        gm.fishingRod = nullptr;
-        gm.fishingRodActive = false;
-        printf("낚싯대 OFF\n");
-    } else {
-        gm.fishingRod = new FishingRod(12, 20.0f);
-        gm.fishingRodActive = true;
-        printf("낚싯대 ON (Ctrl+Alt+F)\n");
-    }
-}
 
 // 두 고양이 사이의 거리(픽셀) 반환
 float GetDistance(Cat* a, Cat* b) {
@@ -198,10 +182,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
         int w = rc.right - rc.left;
         int h = rc.bottom - rc.top;
         
-        if (gm.fishingRodActive && gm.fishingRod) {
-            Graphics g(hdc);
-            gm.fishingRod->Render(g);
-        }
+        // if (gm.fishingRodActive && gm.fishingRod) {
+        //     Graphics g(hdc);
+        //     gm.fishingRod->Render(g);
+        // }
         
         pCat->Render(hdc, w, h);
         
@@ -353,9 +337,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             break;
         }
         case ID_TOGGLE_FISHING_ROD: {
-            gm.toggle_fishing_rod();
+            gm.toggleFishingRod();
             // 토글 추가
-            std::cout << "AA" << std::endl;
+            // std::cout << "AA" << std::endl;
         }
         } // end switch
         return 0;
@@ -431,7 +415,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR pCmdLine,
     wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON));
     
     // 업데이트 확인
-    CheckForUpdate(NULL); 
+    //CheckForUpdate(NULL); 
 
     RegisterClassExW(&wc);
 
